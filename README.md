@@ -9,6 +9,7 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 - **Grid-Based Movement**: Movement restricted to 4 directions (no diagonals) with grid snapping
 - **Obstacle Avoidance**: Automatically paths around trees and rocks
 - **Real-time Multiplayer**: See other players move around in real-time
+- **Custom Tileset**: Beautiful 128x128 pixel tiles from Grassland.png
 - **Procedurally Generated Map**: 100x100 tile world with grass and dirt terrain
 - **Resource Gathering**: 3-second gathering with progress bar animation
 - **Click-to-Gather**: Click resources from anywhere - auto-paths to nearest adjacent tile
@@ -29,6 +30,9 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 ```
 minirpg/
 ├── client/                 # Frontend game client
+│   ├── assets/            # Game assets
+│   │   ├── Grassland.png  # Tileset (15x15, 128x128 per tile)
+│   │   └── README.md      # Tileset documentation
 │   ├── index.html         # Main HTML file
 │   ├── game.js            # Main game scene and orchestration
 │   ├── PathFinder.js      # A* pathfinding algorithm class
@@ -50,7 +54,11 @@ minirpg/
 
 ### Installation
 
-1. Navigate to the server directory and install dependencies:
+1. **Add your tileset** (required):
+   - Place `Grassland.png` (1920x1920 pixels, 15x15 tiles) in `client/assets/`
+   - See `client/assets/README.md` for tileset specifications
+
+2. Navigate to the server directory and install dependencies:
 
 ```bash
 cd server

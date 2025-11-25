@@ -36,7 +36,11 @@ let inventoryUI;
 let gameMap = [];
 
 function preload() {
-    // Textures are generated procedurally
+    // Load tileset - 15x15 grid, each tile is 128x128 pixels
+    this.load.spritesheet('tileset', 'assets/Grassland.png', {
+        frameWidth: 128,
+        frameHeight: 128
+    });
 }
 
 function create() {
@@ -153,27 +157,39 @@ function setupInputHandlers(scene) {
 function generateMap(scene, mapData) {
     gameMap = mapData;
 
+    // Tile indices from Grassland.png tileset (15x15 grid, 128x128 per tile)
+    const TILE_GRASS = 17;        // Main grass tile
+    const TILE_GRASS_VAR = 19;    // Grass variant (less common)
+    const TILE_DIRT = 48;         // Dirt tile
+
     for (let y = 0; y < WORLD_HEIGHT; y++) {
         for (let x = 0; x < WORLD_WIDTH; x++) {
             const tile = gameMap[y][x];
             const posX = x * TILE_SIZE;
             const posY = y * TILE_SIZE;
 
-            let color;
+            let tileIndex;
             if (tile === 'grass') {
-                color = 0x228B22;
+                // 80% regular grass, 20% grass variant
+                tileIndex = Math.random() < 0.8 ? TILE_GRASS : TILE_GRASS_VAR;
             } else if (tile === 'dirt') {
-                color = 0x8B7355;
+                tileIndex = TILE_DIRT;
+            } else {
+                tileIndex = TILE_GRASS; // Default to grass
             }
 
-            const tileRect = scene.add.rectangle(posX, posY, TILE_SIZE, TILE_SIZE, color);
-            tileRect.setOrigin(0, 0);
-            tileRect.setStrokeStyle(1, 0x000000, 0.1);
+            // Create sprite from tileset and scale from 128x128 to 32x32
+            const tileSprite = scene.add.sprite(posX, posY, 'tileset', tileIndex);
+            tileSprite.setOrigin(0, 0);
+            tileSprite.setDisplaySize(TILE_SIZE, TILE_SIZE);
+            tileSprite.setDepth(0);
         }
     }
 
+    // Draw grid lines
     const gridGraphics = scene.add.graphics();
     gridGraphics.lineStyle(1, 0x000000, 0.1);
+    gridGraphics.setDepth(1);
     for (let x = 0; x <= WORLD_WIDTH; x++) {
         gridGraphics.lineBetween(x * TILE_SIZE, 0, x * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
     }
