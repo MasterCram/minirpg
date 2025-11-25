@@ -5,13 +5,16 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 ## Features
 
 - **Full-Screen Gameplay**: Responsive game that fills your entire browser window
-- **Mouse Click Movement**: Click anywhere to move - automatically snaps to grid centers
+- **Smart Pathfinding**: A* algorithm finds optimal routes around obstacles
+- **Grid-Based Movement**: Movement restricted to 4 directions (no diagonals) with grid snapping
+- **Obstacle Avoidance**: Automatically paths around trees and rocks
 - **Real-time Multiplayer**: See other players move around in real-time
 - **Procedurally Generated Map**: 100x100 tile world with grass and dirt terrain
-- **Resource Gathering**: Click trees to gather wood, click rocks to gather stone
+- **Resource Gathering**: 3-second gathering with progress bar animation
+- **Click-to-Gather**: Click resources from anywhere - auto-paths to nearest adjacent tile
 - **Inventory System**: Track your collected resources with a real-time UI
 - **Resource Respawning**: Resources respawn after 5 seconds when gathered
-- **Grid-based World**: Clean 32x32 tile-based movement and world
+- **Class-Based Architecture**: Clean OOP design with separated concerns
 - **Color-coded Players**: You're blue, other players are red
 
 ## Tech Stack
@@ -19,6 +22,7 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 - **Frontend**: Phaser 3 (HTML5 game framework)
 - **Backend**: Node.js + Express + Socket.io
 - **Real-time Communication**: WebSockets via Socket.io
+- **Architecture**: Class-based OOP design with separation of concerns
 
 ## Project Structure
 
@@ -26,7 +30,11 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 minirpg/
 ├── client/                 # Frontend game client
 │   ├── index.html         # Main HTML file
-│   └── game.js            # Phaser 3 game logic
+│   ├── game.js            # Main game scene and orchestration
+│   ├── PathFinder.js      # A* pathfinding algorithm class
+│   ├── Player.js          # Player entity and behavior class
+│   ├── Resource.js        # Resource (tree/rock) entity class
+│   └── InventoryUI.js     # Inventory UI management class
 ├── server/                # Backend server
 │   ├── server.js          # Express + Socket.io server
 │   └── package.json       # Server dependencies
@@ -95,15 +103,39 @@ npm run dev
 - Handles player connections and disconnections
 - Serves the static client files
 
-### Client (`client/game.js`)
+### Client (Class-based Architecture)
 
-- Full-screen responsive game using Phaser 3
-- Renders the procedurally generated tilemap
-- Handles mouse click movement with pathfinding to grid centers
-- Creates interactive tree and rock sprites
-- Manages inventory UI display
-- Communicates with server via Socket.io
-- Updates other players' positions in real-time with smooth tweening
+**PathFinder.js** - Pathfinding System
+- A* algorithm implementation for optimal grid-based pathfinding
+- Maintains obstacle grid synchronized with resource positions
+- Provides Manhattan distance heuristic
+- No diagonal movement - only up/down/left/right
+- Finds paths around obstacles automatically
+
+**Player.js** - Player Entity
+- Manages player sprite, movement, and state
+- Handles tile-by-tile pathfollowing
+- Manages gathering progress bar and animations
+- Tracks inventory and player stats
+- Supports both main player and other players
+
+**Resource.js** - Resource Entity
+- Manages tree and rock sprites
+- Handles interactive click events
+- Tracks resource position and type
+- Provides grid position calculations
+
+**InventoryUI.js** - UI Management
+- Creates and updates inventory display
+- Real-time resource count updates
+- Modular UI component
+
+**game.js** - Main Game Scene
+- Orchestrates all game systems
+- Handles Socket.io communication
+- Manages game state and player interactions
+- Coordinates between all classes
+- Renders procedurally generated tilemap
 
 ## Next Steps to Expand
 
@@ -111,8 +143,10 @@ Here are some ideas to enhance your game:
 
 ### Gameplay Features
 - [x] Add inventory and items (wood, stone)
-- [x] Implement resource gathering system
+- [x] Implement resource gathering system with progress bar
 - [x] Implement a procedurally generated tilemap
+- [x] Implement A* pathfinding with obstacle avoidance
+- [x] Add grid-based movement (no diagonals)
 - [ ] Add player sprite animations
 - [ ] Expand tilemap (towns, dungeons, water, etc.)
 - [ ] Add NPCs and enemies
@@ -144,6 +178,25 @@ Here are some ideas to enhance your game:
 - [ ] Create different zones/maps
 - [ ] Add background music and sound effects
 - [ ] Design equipment and weapons
+
+## Code Architecture
+
+The game follows a clean, class-based OOP architecture with clear separation of concerns:
+
+### Class Responsibilities
+
+- **PathFinder**: Handles all pathfinding logic (A* algorithm, obstacle detection)
+- **Player**: Manages player state, movement, and gathering behavior
+- **Resource**: Represents tree and rock entities
+- **InventoryUI**: Handles all UI rendering and updates
+- **game.js**: Orchestrates all systems and handles socket communication
+
+### Benefits
+
+- **Maintainability**: Each class has a single responsibility
+- **Reusability**: Classes can be easily extended or modified
+- **Testability**: Individual components can be tested in isolation
+- **Readability**: Clear separation makes code easy to understand
 
 ## Customization
 
