@@ -4,11 +4,15 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 
 ## Features
 
+- **Full-Screen Gameplay**: Responsive game that fills your entire browser window
+- **Mouse Click Movement**: Click anywhere to move - automatically snaps to grid centers
 - **Real-time Multiplayer**: See other players move around in real-time
-- **Smooth Movement**: WASD or Arrow key controls
-- **Multiplayer Sync**: Player positions synchronized across all clients
-- **Grid-based World**: 1600x1200 game world with visual grid
-- **Simple Graphics**: Color-coded player sprites (you're blue, others are red)
+- **Procedurally Generated Map**: 100x100 tile world with grass and dirt terrain
+- **Resource Gathering**: Click trees to gather wood, click rocks to gather stone
+- **Inventory System**: Track your collected resources with a real-time UI
+- **Resource Respawning**: Resources respawn after 5 seconds when gathered
+- **Grid-based World**: Clean 32x32 tile-based movement and world
+- **Color-coded Players**: You're blue, other players are red
 
 ## Tech Stack
 
@@ -73,38 +77,52 @@ npm run dev
 
 ## Controls
 
-- **Movement**: WASD or Arrow Keys
-- Move around the world and see other players in real-time!
+- **Movement**: Click anywhere on the map to move (snaps to grid centers)
+- **Gather Resources**: Click on trees or rocks when nearby to gather them
+- **Camera**: Follows your player automatically
+- Move around the world, gather resources, and see other players in real-time!
 
 ## How It Works
 
 ### Server (`server/server.js`)
 
-- Manages connected players
+- Generates a 100x100 tile procedural map with grass and dirt
+- Spawns 150 trees and 100 rocks randomly across the map
+- Manages connected players and their inventories
 - Broadcasts player movements to all clients
+- Handles resource gathering and respawning (5 second delay)
+- Syncs inventory updates to clients
 - Handles player connections and disconnections
 - Serves the static client files
 
 ### Client (`client/game.js`)
 
-- Renders the game world using Phaser 3
-- Handles player input (keyboard controls)
+- Full-screen responsive game using Phaser 3
+- Renders the procedurally generated tilemap
+- Handles mouse click movement with pathfinding to grid centers
+- Creates interactive tree and rock sprites
+- Manages inventory UI display
 - Communicates with server via Socket.io
-- Updates other players' positions in real-time
+- Updates other players' positions in real-time with smooth tweening
 
 ## Next Steps to Expand
 
 Here are some ideas to enhance your game:
 
 ### Gameplay Features
-- [ ] Add player sprites and animations
-- [ ] Implement a proper tilemap (towns, dungeons, etc.)
+- [x] Add inventory and items (wood, stone)
+- [x] Implement resource gathering system
+- [x] Implement a procedurally generated tilemap
+- [ ] Add player sprite animations
+- [ ] Expand tilemap (towns, dungeons, water, etc.)
 - [ ] Add NPCs and enemies
 - [ ] Create a combat system
-- [ ] Add inventory and items
+- [ ] Add crafting system (use wood/stone to build items)
 - [ ] Implement quests/missions
 - [ ] Add character stats (HP, attack, defense)
+- [ ] Add experience and leveling system
 - [ ] Create different character classes
+- [ ] Add more resource types (iron, gold, gems)
 
 ### Multiplayer Features
 - [ ] Add chat system
@@ -131,23 +149,38 @@ Here are some ideas to enhance your game:
 
 ### Change World Size
 
-Edit in `server/server.js`:
+The world is measured in tiles (not pixels). Each tile is 32x32 pixels.
+
+Edit in both `server/server.js` and `client/game.js`:
 ```javascript
-const WORLD_WIDTH = 1600;
-const WORLD_HEIGHT = 1200;
+const WORLD_WIDTH = 100;  // Number of tiles wide
+const WORLD_HEIGHT = 100; // Number of tiles tall
 ```
 
-And in `client/game.js`:
-```javascript
-this.cameras.main.setBounds(0, 0, 1600, 1200);
-this.physics.world.setBounds(0, 0, 1600, 1200);
-```
+This creates a 100x100 tile world (3200x3200 pixels).
 
 ### Change Player Speed
 
 Edit in `client/game.js`:
 ```javascript
-const speed = 200; // Change this value
+const moveSpeed = 150; // Change this value (pixels per second)
+```
+
+### Change Resource Counts
+
+Edit in `server/server.js` in the `generateResources()` function:
+```javascript
+const treeCount = 150;  // Number of trees to spawn
+const rockCount = 100;  // Number of rocks to spawn
+```
+
+### Change Resource Respawn Time
+
+Edit in `server/server.js` in the `gatherResource` event:
+```javascript
+setTimeout(() => {
+  // ... respawn logic
+}, 5000);  // Time in milliseconds (5000 = 5 seconds)
 ```
 
 ### Change Server Port

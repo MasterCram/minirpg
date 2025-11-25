@@ -5,35 +5,45 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MiniRPG - 2D Multiplayer</title>
     <style>
-        body {
+        * {
             margin: 0;
             padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            background: #2c3e50;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a1a;
             font-family: Arial, sans-serif;
         }
         #game-container {
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            width: 100%;
+            height: 100%;
         }
         #ui {
-            position: absolute;
+            position: fixed;
             top: 10px;
             left: 10px;
             color: white;
-            background: rgba(0,0,0,0.7);
-            padding: 10px;
-            border-radius: 5px;
+            background: rgba(0,0,0,0.8);
+            padding: 12px;
+            border-radius: 8px;
             font-size: 14px;
+            border: 2px solid #444;
+            z-index: 1000;
+        }
+        #ui div {
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
     <div id="ui">
-        <div>Use WASD or Arrow Keys to move</div>
-        <div id="player-count">Players online: 0</div>
+        <div><strong>Controls:</strong></div>
+        <div>• Click to move</div>
+        <div>• Click resources to gather</div>
+        <div id="player-count" style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #444;">Players online: 0</div>
     </div>
     <div id="game-container"></div>
 
