@@ -34,7 +34,9 @@ function generateMap() {
     for (let x = 0; x < WORLD_WIDTH; x++) {
       const random = Math.random();
       if (random < 0.85) {
-        gameMap[y][x] = 'grass';
+        // 80% regular grass, 20% grass variant
+        const grassVariant = Math.random();
+        gameMap[y][x] = grassVariant < 0.8 ? 'grass' : 'grass_var';
       } else {
         gameMap[y][x] = 'dirt';
       }

@@ -163,9 +163,9 @@ function generateMap(scene, mapData) {
     gameMap = mapData;
 
     // Tile indices from Grassland.png tileset (16x16 grid, 128x128 per tile)
-    const TILE_GRASS = 16;        // Main grass tile
-    const TILE_GRASS_VAR = 18;    // Grass variant (less common)
-    const TILE_DIRT = 47;         // Dirt tile
+    const TILE_GRASS = 17;        // Main grass tile
+    const TILE_GRASS_VAR = 19;    // Grass variant (less common)
+    const TILE_DIRT = 50;         // Dirt tile
 
     // Debug: Check if tileset is loaded
     if (!scene.textures.exists('tileset')) {
@@ -182,8 +182,9 @@ function generateMap(scene, mapData) {
 
             let tileIndex;
             if (tile === 'grass') {
-                // 80% regular grass, 20% grass variant
-                tileIndex = Math.random() < 0.8 ? TILE_GRASS : TILE_GRASS_VAR;
+                tileIndex = TILE_GRASS;
+            } else if (tile === 'grass_var') {
+                tileIndex = TILE_GRASS_VAR;
             } else if (tile === 'dirt') {
                 tileIndex = TILE_DIRT;
             } else {

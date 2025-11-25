@@ -23,9 +23,9 @@ Row 3: 48 49 50...
 ```
 
 **Current Mapping:**
-- **Tile 16**: Main grass tile (used 80% of the time)
-- **Tile 18**: Grass variant (used 20% of the time)
-- **Tile 47**: Dirt tile
+- **Tile 17**: Main grass tile (used 80% of the time)
+- **Tile 19**: Grass variant (used 20% of the time)
+- **Tile 50**: Dirt tile
 
 ### In-Game Rendering
 
