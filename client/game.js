@@ -132,7 +132,12 @@ function setupSocketConnection(scene) {
 
 function setupInputHandlers(scene) {
     scene.input.on('pointerdown', (pointer) => {
-        if (!mainPlayer || mainPlayer.isGathering) return;
+        console.log('Click detected - mainPlayer:', !!mainPlayer, 'isGathering:', mainPlayer?.isGathering, 'isMoving:', mainPlayer?.isMoving);
+
+        if (!mainPlayer || mainPlayer.isGathering) {
+            console.log('Click blocked - no player or gathering');
+            return;
+        }
 
         const worldX = pointer.worldX;
         const worldY = pointer.worldY;
@@ -140,21 +145,27 @@ function setupInputHandlers(scene) {
         const gridX = Math.floor(worldX / TILE_SIZE);
         const gridY = Math.floor(worldY / TILE_SIZE);
 
+        console.log('Click at grid:', gridX, gridY);
+
         if (gridX >= 0 && gridX < WORLD_WIDTH && gridY >= 0 && gridY < WORLD_HEIGHT) {
             const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
+            console.log('Player at grid:', playerPos.x, playerPos.y);
 
             // Skip if already at destination
             if (playerPos.x === gridX && playerPos.y === gridY) {
+                console.log('Already at destination');
                 return;
             }
 
             const path = pathFinder.findPath(playerPos.x, playerPos.y, gridX, gridY);
+            console.log('Path found:', path?.length, 'waypoints');
 
             // Only set path if it exists and has waypoints
             if (path && path.length > 0) {
                 clearPathDots();
                 createPathDots(scene, path);
                 mainPlayer.setPath(path);
+                console.log('Path set successfully');
             } else if (path === null) {
                 console.log('No path found to destination - obstacle or blocked');
             }

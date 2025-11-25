@@ -46,6 +46,7 @@ class Player {
     }
 
     setPath(path) {
+        console.log('setPath called - isGathering:', this.isGathering, 'path length:', path.length);
         if (this.isGathering) return;
 
         // Allow interrupting current movement
@@ -54,6 +55,7 @@ class Player {
         this.currentPath = path;
         this.pathIndex = 0;
         this.isMoving = true;
+        console.log('Path set - isMoving:', this.isMoving, 'currentPath:', this.currentPath.length, 'pathIndex:', this.pathIndex);
     }
 
     stopMovement() {
@@ -130,6 +132,10 @@ class Player {
             const target = this.currentPath[this.pathIndex];
             const targetX = target.x * TILE_SIZE + TILE_SIZE / 2;
             const targetY = target.y * TILE_SIZE + TILE_SIZE / 2;
+
+            if (this.pathIndex === 0) {
+                console.log('Moving - pathIndex:', this.pathIndex, 'to:', target.x, target.y);
+            }
 
             const distance = Phaser.Math.Distance.Between(
                 this.sprite.x,
