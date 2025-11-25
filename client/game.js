@@ -1,6 +1,7 @@
 const TILE_SIZE = 32;
 const WORLD_WIDTH = 100;
 const WORLD_HEIGHT = 100;
+const GATHER_TIME = 3000; // 3 seconds
 
 const config = {
     type: Phaser.AUTO,
@@ -28,15 +29,20 @@ let socket;
 let player;
 let otherPlayers = {};
 let gameMap = [];
-let tileLayer;
+let obstacleGrid = [];
 let resourceObjects = {};
 let inventory = {
     wood: 0,
     stone: 0
 };
 let inventoryUI;
-let targetPosition = null;
-let moveSpeed = 150;
+let currentPath = [];
+let pathIndex = 0;
+let moveSpeed = 4; // Tiles per second
+let isMoving = false;
+let isGathering = false;
+let gatheringProgress = null;
+let currentScene;
 
 function preload() {
     // We'll generate textures procedurally
@@ -44,9 +50,12 @@ function preload() {
 
 function create() {
     const scene = this;
+    currentScene = scene;
 
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
     this.physics.world.setBounds(0, 0, WORLD_WIDTH * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
+
+    initializeObstacleGrid();
 
     socket = io('http://localhost:3000');
 
@@ -97,7 +106,12 @@ function create() {
 
     socket.on('resourceGathered', (data) => {
         if (resourceObjects[data.resourceId]) {
-            resourceObjects[data.resourceId].destroy();
+            const resource = resourceObjects[data.resourceId];
+            const gridX = Math.floor(resource.x / TILE_SIZE);
+            const gridY = Math.floor(resource.y / TILE_SIZE);
+            obstacleGrid[gridY][gridX] = 0;
+
+            resource.destroy();
             delete resourceObjects[data.resourceId];
         }
     });
@@ -108,16 +122,40 @@ function create() {
     });
 
     this.input.on('pointerdown', (pointer) => {
+        if (isGathering) return;
+
         const worldX = pointer.worldX;
         const worldY = pointer.worldY;
 
-        const gridX = Math.floor(worldX / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
-        const gridY = Math.floor(worldY / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2;
+        const gridX = Math.floor(worldX / TILE_SIZE);
+        const gridY = Math.floor(worldY / TILE_SIZE);
 
-        targetPosition = { x: gridX, y: gridY };
+        if (gridX >= 0 && gridX < WORLD_WIDTH && gridY >= 0 && gridY < WORLD_HEIGHT) {
+            if (player) {
+                const playerGridX = Math.floor(player.sprite.x / TILE_SIZE);
+                const playerGridY = Math.floor(player.sprite.y / TILE_SIZE);
+
+                const path = findPath(playerGridX, playerGridY, gridX, gridY);
+                if (path && path.length > 0) {
+                    currentPath = path;
+                    pathIndex = 0;
+                    isMoving = true;
+                }
+            }
+        }
     });
 
     createInventoryUI(scene);
+}
+
+function initializeObstacleGrid() {
+    obstacleGrid = [];
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
+        obstacleGrid[y] = [];
+        for (let x = 0; x < WORLD_WIDTH; x++) {
+            obstacleGrid[y][x] = 0;
+        }
+    }
 }
 
 function generateMap(scene, mapData) {
@@ -223,22 +261,56 @@ function createResource(scene, resource) {
     sprite.setData('resourceId', resource.id);
     sprite.setData('resourceType', resource.type);
 
-    sprite.on('pointerdown', () => {
-        if (player) {
-            const distance = Phaser.Math.Distance.Between(
-                player.sprite.x,
-                player.sprite.y,
-                sprite.x,
-                sprite.y
-            );
+    const gridX = Math.floor(resource.x / TILE_SIZE);
+    const gridY = Math.floor(resource.y / TILE_SIZE);
+    obstacleGrid[gridY][gridX] = 1;
 
-            if (distance <= TILE_SIZE * 2) {
-                socket.emit('gatherResource', resource.id);
+    sprite.on('pointerdown', (pointer) => {
+        pointer.event.stopPropagation();
+
+        if (player && !isGathering) {
+            const playerGridX = Math.floor(player.sprite.x / TILE_SIZE);
+            const playerGridY = Math.floor(player.sprite.y / TILE_SIZE);
+
+            const resourceGridX = Math.floor(sprite.x / TILE_SIZE);
+            const resourceGridY = Math.floor(sprite.y / TILE_SIZE);
+
+            const distance = Math.abs(playerGridX - resourceGridX) + Math.abs(playerGridY - resourceGridY);
+
+            if (distance <= 1) {
+                startGathering(scene, resource.id, sprite);
             } else {
-                targetPosition = {
-                    x: Math.floor(sprite.x / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2,
-                    y: Math.floor(sprite.y / TILE_SIZE) * TILE_SIZE + TILE_SIZE / 2
-                };
+                const adjacentTiles = [
+                    { x: resourceGridX - 1, y: resourceGridY },
+                    { x: resourceGridX + 1, y: resourceGridY },
+                    { x: resourceGridX, y: resourceGridY - 1 },
+                    { x: resourceGridX, y: resourceGridY + 1 }
+                ];
+
+                let closestTile = null;
+                let minDistance = Infinity;
+
+                for (const tile of adjacentTiles) {
+                    if (tile.x >= 0 && tile.x < WORLD_WIDTH && tile.y >= 0 && tile.y < WORLD_HEIGHT) {
+                        if (obstacleGrid[tile.y][tile.x] === 0) {
+                            const dist = Math.abs(playerGridX - tile.x) + Math.abs(playerGridY - tile.y);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                closestTile = tile;
+                            }
+                        }
+                    }
+                }
+
+                if (closestTile) {
+                    const path = findPath(playerGridX, playerGridY, closestTile.x, closestTile.y);
+                    if (path && path.length > 0) {
+                        currentPath = path;
+                        pathIndex = 0;
+                        isMoving = true;
+                        player.targetResource = resource.id;
+                    }
+                }
             }
         }
     });
@@ -246,45 +318,189 @@ function createResource(scene, resource) {
     resourceObjects[resource.id] = sprite;
 }
 
-function update() {
+function startGathering(scene, resourceId, sprite) {
+    isGathering = true;
+    isMoving = false;
+    currentPath = [];
+
+    const progressBarBg = scene.add.rectangle(
+        player.sprite.x,
+        player.sprite.y - 40,
+        60,
+        8,
+        0x000000
+    );
+    progressBarBg.setDepth(12);
+
+    const progressBarFill = scene.add.rectangle(
+        player.sprite.x - 30,
+        player.sprite.y - 40,
+        0,
+        6,
+        0x00ff00
+    );
+    progressBarFill.setOrigin(0, 0.5);
+    progressBarFill.setDepth(13);
+
+    gatheringProgress = {
+        bg: progressBarBg,
+        fill: progressBarFill,
+        startTime: Date.now(),
+        resourceId: resourceId
+    };
+}
+
+function findPath(startX, startY, endX, endY) {
+    if (obstacleGrid[endY][endX] === 1) {
+        return null;
+    }
+
+    const openSet = [];
+    const closedSet = new Set();
+    const cameFrom = new Map();
+    const gScore = new Map();
+    const fScore = new Map();
+
+    const startKey = `${startX},${startY}`;
+    const endKey = `${endX},${endY}`;
+
+    openSet.push({ x: startX, y: startY, key: startKey });
+    gScore.set(startKey, 0);
+    fScore.set(startKey, heuristic(startX, startY, endX, endY));
+
+    while (openSet.length > 0) {
+        openSet.sort((a, b) => fScore.get(a.key) - fScore.get(b.key));
+        const current = openSet.shift();
+
+        if (current.key === endKey) {
+            return reconstructPath(cameFrom, current.key, startX, startY);
+        }
+
+        closedSet.add(current.key);
+
+        const neighbors = [
+            { x: current.x - 1, y: current.y },
+            { x: current.x + 1, y: current.y },
+            { x: current.x, y: current.y - 1 },
+            { x: current.x, y: current.y + 1 }
+        ];
+
+        for (const neighbor of neighbors) {
+            if (neighbor.x < 0 || neighbor.x >= WORLD_WIDTH || neighbor.y < 0 || neighbor.y >= WORLD_HEIGHT) {
+                continue;
+            }
+
+            const neighborKey = `${neighbor.x},${neighbor.y}`;
+
+            if (closedSet.has(neighborKey)) {
+                continue;
+            }
+
+            if (obstacleGrid[neighbor.y][neighbor.x] === 1 && neighborKey !== endKey) {
+                continue;
+            }
+
+            const tentativeGScore = gScore.get(current.key) + 1;
+
+            if (!openSet.find(n => n.key === neighborKey)) {
+                openSet.push({ x: neighbor.x, y: neighbor.y, key: neighborKey });
+            } else if (tentativeGScore >= (gScore.get(neighborKey) || Infinity)) {
+                continue;
+            }
+
+            cameFrom.set(neighborKey, current.key);
+            gScore.set(neighborKey, tentativeGScore);
+            fScore.set(neighborKey, tentativeGScore + heuristic(neighbor.x, neighbor.y, endX, endY));
+        }
+    }
+
+    return null;
+}
+
+function heuristic(x1, y1, x2, y2) {
+    return Math.abs(x1 - x2) + Math.abs(y1 - y2);
+}
+
+function reconstructPath(cameFrom, currentKey, startX, startY) {
+    const path = [];
+    const startKey = `${startX},${startY}`;
+
+    while (currentKey !== startKey) {
+        const [x, y] = currentKey.split(',').map(Number);
+        path.unshift({
+            x: x * TILE_SIZE + TILE_SIZE / 2,
+            y: y * TILE_SIZE + TILE_SIZE / 2
+        });
+        currentKey = cameFrom.get(currentKey);
+    }
+
+    return path;
+}
+
+function update(time, delta) {
     if (!player) return;
 
-    if (targetPosition) {
+    if (isGathering && gatheringProgress) {
+        const elapsed = Date.now() - gatheringProgress.startTime;
+        const progress = Math.min(elapsed / GATHER_TIME, 1);
+
+        gatheringProgress.fill.width = progress * 60;
+        gatheringProgress.bg.setPosition(player.sprite.x, player.sprite.y - 40);
+        gatheringProgress.fill.setPosition(player.sprite.x - 30, player.sprite.y - 40);
+
+        if (progress >= 1) {
+            socket.emit('gatherResource', gatheringProgress.resourceId);
+
+            gatheringProgress.bg.destroy();
+            gatheringProgress.fill.destroy();
+            gatheringProgress = null;
+            isGathering = false;
+            player.targetResource = null;
+        }
+    } else if (isMoving && currentPath.length > 0) {
+        const target = currentPath[pathIndex];
         const distance = Phaser.Math.Distance.Between(
             player.sprite.x,
             player.sprite.y,
-            targetPosition.x,
-            targetPosition.y
+            target.x,
+            target.y
         );
 
-        if (distance > 4) {
+        if (distance < 2) {
+            player.sprite.setPosition(target.x, target.y);
+
+            socket.emit('playerMovement', {
+                x: target.x,
+                y: target.y
+            });
+
+            pathIndex++;
+
+            if (pathIndex >= currentPath.length) {
+                isMoving = false;
+                currentPath = [];
+                pathIndex = 0;
+
+                if (player.targetResource) {
+                    const resourceSprite = resourceObjects[player.targetResource];
+                    if (resourceSprite) {
+                        startGathering(currentScene, player.targetResource, resourceSprite);
+                    }
+                    player.targetResource = null;
+                }
+            }
+        } else {
+            const speed = (moveSpeed * TILE_SIZE * delta) / 1000;
             const angle = Phaser.Math.Angle.Between(
                 player.sprite.x,
                 player.sprite.y,
-                targetPosition.x,
-                targetPosition.y
+                target.x,
+                target.y
             );
 
-            player.sprite.setVelocity(
-                Math.cos(angle) * moveSpeed,
-                Math.sin(angle) * moveSpeed
-            );
-
-            socket.emit('playerMovement', {
-                x: player.sprite.x,
-                y: player.sprite.y
-            });
-        } else {
-            player.sprite.setVelocity(0);
-            player.sprite.setPosition(targetPosition.x, targetPosition.y);
-            socket.emit('playerMovement', {
-                x: targetPosition.x,
-                y: targetPosition.y
-            });
-            targetPosition = null;
+            player.sprite.x += Math.cos(angle) * speed;
+            player.sprite.y += Math.sin(angle) * speed;
         }
-    } else {
-        player.sprite.setVelocity(0);
     }
 
     player.nameText.setPosition(player.sprite.x, player.sprite.y - 25);
