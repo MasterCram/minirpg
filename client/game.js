@@ -34,6 +34,7 @@ let resources = {};
 let pathFinder;
 let inventoryUI;
 let gameMap = [];
+let pathDots = []; // Visual path indicators
 
 function preload() {
     // Load tileset - 16x16 grid, each tile is 128x128 pixels
@@ -136,8 +137,8 @@ function setupInputHandlers(scene) {
         const worldX = pointer.worldX;
         const worldY = pointer.worldY;
 
-        const gridX = Math.round(worldX / TILE_SIZE);
-        const gridY = Math.round(worldY / TILE_SIZE);
+        const gridX = Math.floor(worldX / TILE_SIZE);
+        const gridY = Math.floor(worldY / TILE_SIZE);
 
         if (gridX >= 0 && gridX < WORLD_WIDTH && gridY >= 0 && gridY < WORLD_HEIGHT) {
             const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
@@ -151,12 +152,40 @@ function setupInputHandlers(scene) {
 
             // Only set path if it exists and has waypoints
             if (path && path.length > 0) {
+                clearPathDots();
+                createPathDots(scene, path);
                 mainPlayer.setPath(path);
             } else if (path === null) {
                 console.log('No path found to destination - obstacle or blocked');
             }
         }
     });
+}
+
+function createPathDots(scene, path) {
+    pathDots = [];
+
+    for (let i = 0; i < path.length; i++) {
+        const waypoint = path[i];
+        const dotX = waypoint.x * TILE_SIZE + TILE_SIZE / 2;
+        const dotY = waypoint.y * TILE_SIZE + TILE_SIZE / 2;
+
+        const dot = scene.add.circle(dotX, dotY, 3, 0xffffff, 0.8);
+        dot.setDepth(9);
+        pathDots.push(dot);
+    }
+}
+
+function clearPathDots() {
+    pathDots.forEach(dot => dot.destroy());
+    pathDots = [];
+}
+
+function removePathDot(index) {
+    if (pathDots[index]) {
+        pathDots[index].destroy();
+        pathDots[index] = null;
+    }
 }
 
 function generateMap(scene, mapData) {
@@ -269,6 +298,8 @@ function handleResourceClick(resource) {
 
             const path = pathFinder.findPath(playerPos.x, playerPos.y, closestTile.x, closestTile.y);
             if (path && path.length > 0) {
+                clearPathDots();
+                createPathDots(currentScene, path);
                 mainPlayer.setPath(path);
                 mainPlayer.targetResource = resource.id;
             } else if (path === null) {
@@ -304,23 +335,35 @@ function update(time, delta) {
         socket.emit('gatherResource', resourceId);
     });
 
-    const pathCompleted = mainPlayer.update(delta, TILE_SIZE, (x, y) => {
-        socket.emit('playerMovement', { x, y });
-    });
-
-    // If path completed and player has a target resource, start gathering
-    if (pathCompleted && mainPlayer.targetResource) {
-        const targetResource = resources[mainPlayer.targetResource];
-        if (targetResource && !targetResource.isDestroyed()) {
-            const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
-            const resourcePos = targetResource.getGridPosition(TILE_SIZE);
-            const distance = Math.abs(playerPos.x - resourcePos.x) + Math.abs(playerPos.y - resourcePos.y);
-
-            if (distance <= 1) {
-                mainPlayer.startGathering(mainPlayer.targetResource);
-            }
+    const pathCompleted = mainPlayer.update(
+        delta,
+        TILE_SIZE,
+        (x, y) => {
+            socket.emit('playerMovement', { x, y });
+        },
+        (waypointIndex) => {
+            removePathDot(waypointIndex);
         }
-        mainPlayer.targetResource = null;
+    );
+
+    // If path completed, clear any remaining dots
+    if (pathCompleted) {
+        clearPathDots();
+
+        // If player has a target resource, start gathering
+        if (mainPlayer.targetResource) {
+            const targetResource = resources[mainPlayer.targetResource];
+            if (targetResource && !targetResource.isDestroyed()) {
+                const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
+                const resourcePos = targetResource.getGridPosition(TILE_SIZE);
+                const distance = Math.abs(playerPos.x - resourcePos.x) + Math.abs(playerPos.y - resourcePos.y);
+
+                if (distance <= 1) {
+                    mainPlayer.startGathering(mainPlayer.targetResource);
+                }
+            }
+            mainPlayer.targetResource = null;
+        }
     }
 
     // Update other players

@@ -120,7 +120,7 @@ class Player {
         this.targetResource = null;
     }
 
-    update(delta, TILE_SIZE, onPositionUpdate) {
+    update(delta, TILE_SIZE, onPositionUpdate, onWaypointReached) {
         if (this.isGathering) {
             // Handled separately in updateGathering
         } else if (this.isMoving && this.currentPath.length > 0) {
@@ -143,6 +143,11 @@ class Player {
 
                 if (onPositionUpdate) {
                     onPositionUpdate(targetX, targetY);
+                }
+
+                // Notify that waypoint was reached
+                if (onWaypointReached) {
+                    onWaypointReached(this.pathIndex);
                 }
 
                 this.pathIndex++;
@@ -171,8 +176,8 @@ class Player {
 
     getGridPosition(TILE_SIZE) {
         return {
-            x: Math.round(this.sprite.x / TILE_SIZE),
-            y: Math.round(this.sprite.y / TILE_SIZE)
+            x: Math.floor(this.sprite.x / TILE_SIZE),
+            y: Math.floor(this.sprite.y / TILE_SIZE)
         };
     }
 
