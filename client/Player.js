@@ -49,9 +49,7 @@ class Player {
         console.log('setPath called - isGathering:', this.isGathering, 'path length:', path.length);
         if (this.isGathering) return;
 
-        // Allow interrupting current movement
-        this.stopMovement();
-
+        // Simply replace the current path - allows mid-movement path changes
         this.currentPath = path;
         this.pathIndex = 0;
         this.isMoving = true;
