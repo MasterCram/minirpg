@@ -157,10 +157,10 @@ function setupInputHandlers(scene) {
 function generateMap(scene, mapData) {
     gameMap = mapData;
 
-    // Tile indices from Grassland.png tileset (15x15 grid, 128x128 per tile)
-    const TILE_GRASS = 17;        // Main grass tile
-    const TILE_GRASS_VAR = 19;    // Grass variant (less common)
-    const TILE_DIRT = 48;         // Dirt tile
+    // Tile indices from Grassland.png tileset (16x16 grid, 128x128 per tile)
+    const TILE_GRASS = 16;        // Main grass tile
+    const TILE_GRASS_VAR = 18;    // Grass variant (less common)
+    const TILE_DIRT = 47;         // Dirt tile
 
     for (let y = 0; y < WORLD_HEIGHT; y++) {
         for (let x = 0; x < WORLD_WIDTH; x++) {

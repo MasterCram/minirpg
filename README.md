@@ -31,7 +31,7 @@ A simple 2D multiplayer RPG game inspired by RuneScape, built with Phaser 3 and 
 minirpg/
 ├── client/                 # Frontend game client
 │   ├── assets/            # Game assets
-│   │   ├── Grassland.png  # Tileset (15x15, 128x128 per tile)
+│   │   ├── Grassland.png  # Tileset (16x16, 128x128 per tile)
 │   │   └── README.md      # Tileset documentation
 │   ├── index.html         # Main HTML file
 │   ├── game.js            # Main game scene and orchestration
@@ -55,7 +55,7 @@ minirpg/
 ### Installation
 
 1. **Add your tileset** (required):
-   - Place `Grassland.png` (1920x1920 pixels, 15x15 tiles) in `client/assets/`
+   - Place `Grassland.png` (2048x2048 pixels, 16x16 tiles) in `client/assets/`
    - See `client/assets/README.md` for tileset specifications
 
 2. Navigate to the server directory and install dependencies:
