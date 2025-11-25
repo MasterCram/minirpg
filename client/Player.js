@@ -48,6 +48,9 @@ class Player {
     setPath(path) {
         if (this.isGathering) return;
 
+        // Allow interrupting current movement
+        this.stopMovement();
+
         this.currentPath = path;
         this.pathIndex = 0;
         this.isMoving = true;
@@ -123,7 +126,7 @@ class Player {
     update(delta, TILE_SIZE, onPositionUpdate, onWaypointReached) {
         if (this.isGathering) {
             // Handled separately in updateGathering
-        } else if (this.isMoving && this.currentPath.length > 0) {
+        } else if (this.isMoving && this.currentPath.length > 0 && this.pathIndex < this.currentPath.length) {
             const target = this.currentPath[this.pathIndex];
             const targetX = target.x * TILE_SIZE + TILE_SIZE / 2;
             const targetY = target.y * TILE_SIZE + TILE_SIZE / 2;
@@ -135,7 +138,10 @@ class Player {
                 targetY
             );
 
-            const speed = (this.moveSpeed * TILE_SIZE * delta) / 1000;
+            // Fixed movement speed: pixels per second, converted to pixels per frame
+            // moveSpeed is 4 tiles/sec = 128 pixels/sec
+            const pixelsPerSecond = this.moveSpeed * TILE_SIZE;
+            const speed = (pixelsPerSecond * delta) / 1000;
 
             // If very close or will overshoot, snap to exact position
             if (distance <= speed || distance < 1) {
@@ -157,7 +163,7 @@ class Player {
                     return true; // Path completed
                 }
             } else {
-                // Move toward target
+                // Move toward target with consistent speed
                 const angle = Phaser.Math.Angle.Between(
                     this.sprite.x,
                     this.sprite.y,
@@ -165,8 +171,11 @@ class Player {
                     targetY
                 );
 
-                this.sprite.x += Math.cos(angle) * speed;
-                this.sprite.y += Math.sin(angle) * speed;
+                const moveX = Math.cos(angle) * speed;
+                const moveY = Math.sin(angle) * speed;
+
+                this.sprite.x += moveX;
+                this.sprite.y += moveY;
             }
         }
 
