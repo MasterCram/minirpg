@@ -24,11 +24,18 @@ class Player {
         graphics.generateTexture('player-' + this.id, 32, 32);
         graphics.destroy();
 
-        this.sprite = this.scene.physics.add.sprite(x, y, 'player-' + this.id);
+        // Ensure the sprite is created exactly on grid center
+        const TILE_SIZE = 32;
+        const gridX = Math.round(x / TILE_SIZE);
+        const gridY = Math.round(y / TILE_SIZE);
+        const snapX = gridX * TILE_SIZE + TILE_SIZE / 2;
+        const snapY = gridY * TILE_SIZE + TILE_SIZE / 2;
+
+        this.sprite = this.scene.physics.add.sprite(snapX, snapY, 'player-' + this.id);
         this.sprite.setCollideWorldBounds(true);
         this.sprite.setDepth(10);
 
-        this.nameText = this.scene.add.text(x, y - 25, this.username, {
+        this.nameText = this.scene.add.text(snapX, snapY - 25, this.username, {
             fontSize: '11px',
             fill: '#ffffff',
             backgroundColor: '#000000',
@@ -128,7 +135,10 @@ class Player {
                 targetY
             );
 
-            if (distance < 2) {
+            const speed = (this.moveSpeed * TILE_SIZE * delta) / 1000;
+
+            // If very close or will overshoot, snap to exact position
+            if (distance <= speed || distance < 1) {
                 this.sprite.setPosition(targetX, targetY);
 
                 if (onPositionUpdate) {
@@ -142,7 +152,7 @@ class Player {
                     return true; // Path completed
                 }
             } else {
-                const speed = (this.moveSpeed * TILE_SIZE * delta) / 1000;
+                // Move toward target
                 const angle = Phaser.Math.Angle.Between(
                     this.sprite.x,
                     this.sprite.y,
@@ -161,8 +171,8 @@ class Player {
 
     getGridPosition(TILE_SIZE) {
         return {
-            x: Math.floor(this.sprite.x / TILE_SIZE),
-            y: Math.floor(this.sprite.y / TILE_SIZE)
+            x: Math.round(this.sprite.x / TILE_SIZE),
+            y: Math.round(this.sprite.y / TILE_SIZE)
         };
     }
 

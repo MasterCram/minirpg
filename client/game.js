@@ -127,15 +127,24 @@ function setupInputHandlers(scene) {
         const worldX = pointer.worldX;
         const worldY = pointer.worldY;
 
-        const gridX = Math.floor(worldX / TILE_SIZE);
-        const gridY = Math.floor(worldY / TILE_SIZE);
+        const gridX = Math.round(worldX / TILE_SIZE);
+        const gridY = Math.round(worldY / TILE_SIZE);
 
         if (gridX >= 0 && gridX < WORLD_WIDTH && gridY >= 0 && gridY < WORLD_HEIGHT) {
             const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
+
+            // Skip if already at destination
+            if (playerPos.x === gridX && playerPos.y === gridY) {
+                return;
+            }
+
             const path = pathFinder.findPath(playerPos.x, playerPos.y, gridX, gridY);
 
+            // Only set path if it exists and has waypoints
             if (path && path.length > 0) {
                 mainPlayer.setPath(path);
+            } else if (path === null) {
+                console.log('No path found to destination - obstacle or blocked');
             }
         }
     });
@@ -222,11 +231,25 @@ function handleResourceClick(resource) {
         }
 
         if (closestTile) {
+            // Check if player is already at the destination tile
+            if (playerPos.x === closestTile.x && playerPos.y === closestTile.y) {
+                // Already adjacent, start gathering
+                mainPlayer.startGathering(resource.id);
+                return;
+            }
+
             const path = pathFinder.findPath(playerPos.x, playerPos.y, closestTile.x, closestTile.y);
             if (path && path.length > 0) {
                 mainPlayer.setPath(path);
                 mainPlayer.targetResource = resource.id;
+            } else if (path === null) {
+                console.log('Cannot reach resource - no path available');
+            } else {
+                // Empty path means already at destination
+                mainPlayer.startGathering(resource.id);
             }
+        } else {
+            console.log('Resource is completely surrounded by obstacles');
         }
     }
 }

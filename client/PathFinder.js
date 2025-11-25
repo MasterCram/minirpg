@@ -30,6 +30,18 @@ class PathFinder {
     }
 
     findPath(startX, startY, endX, endY) {
+        // Clamp coordinates to valid range
+        startX = Math.max(0, Math.min(startX, this.worldWidth - 1));
+        startY = Math.max(0, Math.min(startY, this.worldHeight - 1));
+        endX = Math.max(0, Math.min(endX, this.worldWidth - 1));
+        endY = Math.max(0, Math.min(endY, this.worldHeight - 1));
+
+        // If already at destination, return empty path
+        if (startX === endX && startY === endY) {
+            return [];
+        }
+
+        // Check if destination is blocked
         if (this.isObstacle(endX, endY)) {
             return null;
         }
@@ -76,6 +88,7 @@ class PathFinder {
                     continue;
                 }
 
+                // Don't treat destination as obstacle, but treat all other obstacles as blocked
                 if (this.obstacleGrid[neighbor.y][neighbor.x] === 1 && neighborKey !== endKey) {
                     continue;
                 }

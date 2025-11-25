@@ -50,8 +50,8 @@ class Resource {
 
     getGridPosition(TILE_SIZE) {
         return {
-            x: Math.floor(this.x / TILE_SIZE),
-            y: Math.floor(this.y / TILE_SIZE)
+            x: Math.round(this.x / TILE_SIZE),
+            y: Math.round(this.y / TILE_SIZE)
         };
     }
 
