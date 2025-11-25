@@ -36,10 +36,15 @@ let inventoryUI;
 let gameMap = [];
 
 function preload() {
-    // Load tileset - 15x15 grid, each tile is 128x128 pixels
+    // Load tileset - 16x16 grid, each tile is 128x128 pixels
     this.load.spritesheet('tileset', 'assets/Grassland.png', {
         frameWidth: 128,
         frameHeight: 128
+    });
+
+    // Add error handler for loading
+    this.load.on('loaderror', (file) => {
+        console.error('Error loading file:', file.src);
     });
 }
 
@@ -161,6 +166,13 @@ function generateMap(scene, mapData) {
     const TILE_GRASS = 16;        // Main grass tile
     const TILE_GRASS_VAR = 18;    // Grass variant (less common)
     const TILE_DIRT = 47;         // Dirt tile
+
+    // Debug: Check if tileset is loaded
+    if (!scene.textures.exists('tileset')) {
+        console.error('Tileset not loaded! Check that Grassland.png is in client/assets/');
+        return;
+    }
+    console.log('Tileset loaded successfully. Generating map...');
 
     for (let y = 0; y < WORLD_HEIGHT; y++) {
         for (let x = 0; x < WORLD_WIDTH; x++) {
