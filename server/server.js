@@ -24,6 +24,8 @@ const players = {};
 let gameMap = [];
 let resources = [];
 let resourceIdCounter = 0;
+let droppedItems = [];
+let droppedItemIdCounter = 0;
 
 // Server-side movement settings
 const MOVE_SPEED = 150; // Pixels per second (matches client)
@@ -279,10 +281,7 @@ io.on('connection', (socket) => {
     x: spawnX,
     y: spawnY,
     username: `Player${Math.floor(Math.random() * 1000)}`,
-    inventory: {
-      wood: 0,
-      stone: 0
-    },
+    inventory: Array(28).fill(null), // 28 slots, each can hold one item type (wood/stone)
     // Server-side movement state
     path: [],
     pathIndex: 0,
@@ -304,6 +303,10 @@ io.on('connection', (socket) => {
 
   socket.on('requestResources', () => {
     socket.emit('resourcesData', resources);
+  });
+
+  socket.on('requestDroppedItems', () => {
+    socket.emit('droppedItemsData', droppedItems);
   });
 
   // Handle path requests from clients
@@ -385,6 +388,76 @@ io.on('connection', (socket) => {
     console.log(`${socket.id} started gathering resource ${resourceId}`);
   });
 
+  // Handle dropping items from inventory
+  socket.on('dropItem', (data) => {
+    const { slotIndex } = data;
+    const player = players[socket.id];
+
+    if (!player || slotIndex < 0 || slotIndex >= 28) return;
+    if (player.inventory[slotIndex] === null) return;
+
+    const itemType = player.inventory[slotIndex];
+    player.inventory[slotIndex] = null;
+
+    // Create dropped item at player position
+    const droppedItem = {
+      id: droppedItemIdCounter++,
+      type: itemType,
+      x: player.x,
+      y: player.y
+    };
+
+    droppedItems.push(droppedItem);
+
+    // Broadcast to all clients
+    io.emit('itemDropped', droppedItem);
+    io.to(socket.id).emit('inventoryUpdate', player.inventory);
+
+    console.log(`${socket.id} dropped ${itemType} at (${player.x}, ${player.y})`);
+  });
+
+  // Handle picking up dropped items
+  socket.on('pickupItem', (data) => {
+    const { itemId } = data;
+    const player = players[socket.id];
+
+    if (!player) return;
+
+    const itemIndex = droppedItems.findIndex(item => item.id === itemId);
+    if (itemIndex === -1) return;
+
+    const item = droppedItems[itemIndex];
+
+    // Check distance
+    const distance = Math.sqrt(
+      Math.pow(player.x - item.x, 2) + Math.pow(player.y - item.y, 2)
+    );
+
+    if (distance > TILE_SIZE * 2) {
+      console.log('Player too far from item');
+      return;
+    }
+
+    // Find empty slot
+    const emptySlot = player.inventory.findIndex(slot => slot === null);
+    if (emptySlot === -1) {
+      console.log('Inventory full');
+      return;
+    }
+
+    // Add to inventory
+    player.inventory[emptySlot] = item.type;
+
+    // Remove from dropped items
+    droppedItems.splice(itemIndex, 1);
+
+    // Broadcast to all clients
+    io.emit('itemPickedUp', { itemId: item.id });
+    io.to(socket.id).emit('inventoryUpdate', player.inventory);
+
+    console.log(`${socket.id} picked up ${item.type}`);
+  });
+
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
     delete players[socket.id];
@@ -436,11 +509,19 @@ setInterval(() => {
           const gridY = Math.floor(resource.y / TILE_SIZE);
           pathFinder.setObstacle(gridX, gridY, false);
 
-          // Update inventory
+          // Update inventory - add items to first available slots
+          let itemsToAdd = [];
           if (resource.type === 'tree') {
-            player.inventory.wood += 1;
+            itemsToAdd = ['wood', 'wood']; // Trees give 2 woods
           } else if (resource.type === 'rock') {
-            player.inventory.stone += 1;
+            itemsToAdd = ['stone']; // Rocks give 1 stone
+          }
+
+          for (const item of itemsToAdd) {
+            const emptySlot = player.inventory.findIndex(slot => slot === null);
+            if (emptySlot !== -1) {
+              player.inventory[emptySlot] = item;
+            }
           }
 
           // Remove resource

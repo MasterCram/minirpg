@@ -34,9 +34,11 @@ let currentScene;
 let mainPlayer;
 let otherPlayers = {};
 let resources = {};
+let droppedItems = {};
 let inventoryUI;
 let gameMap = [];
 let pathDots = []; // Visual path indicators
+let pickupCooldowns = {}; // Track 1-second delay for each dropped item
 
 function preload() {
     // Load tileset - 16x16 grid, each tile is 128x128 pixels
@@ -54,12 +56,16 @@ function preload() {
 function create() {
     currentScene = this;
 
-    this.cameras.main.setBounds(0, 0, WORLD_WIDTH * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
     this.physics.world.setBounds(0, 0, WORLD_WIDTH * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
 
     // Initialize systems
     // Note: PathFinder is now server-side for authoritative movement
     inventoryUI = new InventoryUI();
+    inventoryUI.setDropItemCallback((slotIndex) => {
+        if (socket) {
+            socket.emit('dropItem', { slotIndex });
+        }
+    });
 
     // Setup socket connection
     setupSocketConnection(this);
@@ -105,6 +111,7 @@ function setupSocketConnection(scene) {
 
                 socket.emit('requestMap');
                 socket.emit('requestResources');
+                socket.emit('requestDroppedItems');
             } else {
                 console.log('Creating other player:', id);
                 otherPlayers[id] = new Player(scene, players[id], false);
@@ -228,6 +235,23 @@ function setupSocketConnection(scene) {
         if (player) {
             player.stopGathering();
         }
+    });
+
+    // Listen for dropped items data
+    socket.on('droppedItemsData', (itemsData) => {
+        itemsData.forEach(itemData => {
+            createDroppedItem(scene, itemData);
+        });
+    });
+
+    // Listen for new dropped item
+    socket.on('itemDropped', (itemData) => {
+        createDroppedItem(scene, itemData);
+    });
+
+    // Listen for item picked up
+    socket.on('itemPickedUp', (data) => {
+        removeDroppedItem(data.itemId);
     });
 }
 
@@ -435,6 +459,46 @@ function removeResource(resourceId) {
 
         resource.destroy();
         delete resources[resourceId];
+    }
+}
+
+function createDroppedItem(scene, itemData) {
+    if (droppedItems[itemData.id]) {
+        return; // Item already exists
+    }
+
+    const item = new DroppedItem(scene, itemData);
+
+    // Set click handler with 1-second delay
+    item.setClickHandler((clickedItem) => {
+        handleDroppedItemClick(clickedItem);
+    });
+
+    droppedItems[itemData.id] = item;
+
+    // Add 1-second cooldown before this item can be picked up
+    pickupCooldowns[itemData.id] = Date.now() + 1000;
+}
+
+function handleDroppedItemClick(item) {
+    if (!mainPlayer || mainPlayer.isGathering || mainPlayer.isMoving) return;
+
+    // Check 1-second cooldown
+    const now = Date.now();
+    if (pickupCooldowns[item.id] && now < pickupCooldowns[item.id]) {
+        console.log('Item pickup on cooldown');
+        return;
+    }
+
+    // Request pickup from server
+    socket.emit('pickupItem', { itemId: item.id });
+}
+
+function removeDroppedItem(itemId) {
+    if (droppedItems[itemId]) {
+        droppedItems[itemId].destroy();
+        delete droppedItems[itemId];
+        delete pickupCooldowns[itemId];
     }
 }
 
