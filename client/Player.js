@@ -64,7 +64,7 @@ class Player {
         console.log('stopMovement complete - new state:', {isMoving: this.isMoving, pathLength: this.currentPath.length, pathIndex: this.pathIndex});
     }
 
-    startGathering(resourceId) {
+    startGatheringVisual(resourceId, duration) {
         this.isGathering = true;
         this.stopMovement();
 
@@ -90,29 +90,17 @@ class Player {
         this.gatheringProgress = {
             bg: progressBarBg,
             fill: progressBarFill,
-            startTime: Date.now(),
             resourceId: resourceId,
-            duration: 3000
+            duration: duration || 3000
         };
     }
 
-    updateGathering(onComplete) {
+    updateGatheringProgress(progress) {
         if (!this.isGathering || !this.gatheringProgress) return;
-
-        const elapsed = Date.now() - this.gatheringProgress.startTime;
-        const progress = Math.min(elapsed / this.gatheringProgress.duration, 1);
 
         this.gatheringProgress.fill.width = progress * 60;
         this.gatheringProgress.bg.setPosition(this.sprite.x, this.sprite.y - 40);
         this.gatheringProgress.fill.setPosition(this.sprite.x - 30, this.sprite.y - 40);
-
-        if (progress >= 1) {
-            const resourceId = this.gatheringProgress.resourceId;
-            this.stopGathering();
-            if (onComplete) {
-                onComplete(resourceId);
-            }
-        }
     }
 
     stopGathering() {

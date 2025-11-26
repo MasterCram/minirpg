@@ -11,28 +11,13 @@ class Resource {
     }
 
     createSprite() {
-        const graphics = this.scene.add.graphics();
+        // Use tileset instead of generated graphics
+        // Index 130 for rock, 131 for tree
+        const tileIndex = this.type === 'rock' ? 130 : 131;
 
-        if (this.type === 'tree') {
-            // Tree trunk
-            graphics.fillStyle(0x654321, 1);
-            graphics.fillRect(10, 20, 12, 12);
-            // Tree leaves
-            graphics.fillStyle(0x228B22, 1);
-            graphics.fillCircle(16, 12, 10);
-        } else if (this.type === 'rock') {
-            // Main rock
-            graphics.fillStyle(0x808080, 1);
-            graphics.fillCircle(16, 16, 12);
-            // Rock detail
-            graphics.fillStyle(0x696969, 1);
-            graphics.fillCircle(12, 14, 6);
-        }
-
-        graphics.generateTexture(this.type + '-' + this.id, 32, 32);
-        graphics.destroy();
-
-        this.sprite = this.scene.add.sprite(this.x, this.y, this.type + '-' + this.id);
+        this.sprite = this.scene.add.sprite(this.x, this.y, 'tileset', tileIndex);
+        this.sprite.setOrigin(0.5, 0.5);
+        this.sprite.setDisplaySize(32, 32);
         this.sprite.setInteractive();
         this.sprite.setDepth(5);
         this.sprite.setData('resourceId', this.id);

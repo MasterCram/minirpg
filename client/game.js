@@ -98,7 +98,10 @@ function setupSocketConnection(scene) {
 
                 // Center camera on player with smooth following
                 scene.cameras.main.startFollow(mainPlayer.sprite, true, 0.2, 0.2);
-                scene.cameras.main.setFollowOffset(0, 0); // Center the camera exactly on player
+                scene.cameras.main.setFollowOffset(0, 0);
+
+                // Ensure camera is centered immediately
+                scene.cameras.main.centerOn(mainPlayer.sprite.x, mainPlayer.sprite.y);
 
                 socket.emit('requestMap');
                 socket.emit('requestResources');
@@ -194,11 +197,36 @@ function setupSocketConnection(scene) {
         });
     });
 
-    // Listen for gathering start event from server
-    socket.on('startGathering', (data) => {
-        if (mainPlayer && data.resourceId !== null && data.resourceId !== undefined) {
-            clearPathDots();
-            mainPlayer.startGathering(data.resourceId);
+    // Listen for player started gathering (broadcast from server)
+    socket.on('playerStartedGathering', (data) => {
+        const { playerId, resourceId, duration } = data;
+        const player = playerId === socket.id ? mainPlayer : otherPlayers[playerId];
+
+        if (player) {
+            if (playerId === socket.id) {
+                clearPathDots();
+            }
+            player.startGatheringVisual(resourceId, duration);
+        }
+    });
+
+    // Listen for gathering progress updates
+    socket.on('gatheringProgressUpdate', (updates) => {
+        updates.forEach(update => {
+            const player = update.playerId === socket.id ? mainPlayer : otherPlayers[update.playerId];
+            if (player) {
+                player.updateGatheringProgress(update.progress);
+            }
+        });
+    });
+
+    // Listen for player finished gathering
+    socket.on('playerFinishedGathering', (data) => {
+        const { playerId } = data;
+        const player = playerId === socket.id ? mainPlayer : otherPlayers[playerId];
+
+        if (player) {
+            player.stopGathering();
         }
     });
 }
@@ -350,8 +378,8 @@ function handleResourceClick(resource) {
     const distance = Math.abs(playerPos.x - resourcePos.x) + Math.abs(playerPos.y - resourcePos.y);
 
     if (distance <= 1) {
-        // Adjacent to resource, start gathering immediately
-        mainPlayer.startGathering(resource.id);
+        // Adjacent to resource, request gathering from server
+        socket.emit('startGathering', { resourceId: resource.id });
     } else {
         // Get adjacent tiles (simple calculation, no pathfinding needed)
         const adjacentTiles = [
@@ -413,12 +441,7 @@ function removeResource(resourceId) {
 function update(time, delta) {
     if (!mainPlayer) return;
 
-    // Update gathering progress (only local visual effect)
-    mainPlayer.updateGathering((resourceId) => {
-        socket.emit('gatherResource', resourceId);
-    });
-
-    // Update name text positions for all players (server handles movement)
+    // Update name text positions for all players (server handles all logic)
     mainPlayer.nameText.setPosition(mainPlayer.sprite.x, mainPlayer.sprite.y - 25);
 
     Object.values(otherPlayers).forEach(player => {
