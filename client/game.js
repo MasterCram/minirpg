@@ -1,6 +1,4 @@
-const TILE_SIZE = 32;
-const WORLD_WIDTH = 25;
-const WORLD_HEIGHT = 25;
+// CONFIG is loaded from shared/config.js
 
 const config = {
     type: Phaser.AUTO,
@@ -55,7 +53,7 @@ function preload() {
 function create() {
     currentScene = this;
 
-    this.physics.world.setBounds(0, 0, WORLD_WIDTH * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
+    this.physics.world.setBounds(0, 0, CONFIG.CONFIG.WORLD_WIDTH * CONFIG.CONFIG.TILE_SIZE, CONFIG.CONFIG.WORLD_HEIGHT * CONFIG.CONFIG.TILE_SIZE);
 
     // Initialize systems
     // Note: PathFinder is now server-side for authoritative movement
@@ -271,13 +269,13 @@ function setupInputHandlers(scene) {
         const worldX = pointer.worldX;
         const worldY = pointer.worldY;
 
-        const gridX = Math.floor(worldX / TILE_SIZE);
-        const gridY = Math.floor(worldY / TILE_SIZE);
+        const gridX = Math.floor(worldX / CONFIG.CONFIG.TILE_SIZE);
+        const gridY = Math.floor(worldY / CONFIG.CONFIG.TILE_SIZE);
 
         console.log('Click at grid:', gridX, gridY);
 
-        if (gridX >= 0 && gridX < WORLD_WIDTH && gridY >= 0 && gridY < WORLD_HEIGHT) {
-            const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
+        if (gridX >= 0 && gridX < CONFIG.WORLD_WIDTH && gridY >= 0 && gridY < CONFIG.WORLD_HEIGHT) {
+            const playerPos = mainPlayer.getGridPosition();
             console.log('Player at grid:', playerPos.x, playerPos.y);
 
             // Skip if already at destination
@@ -304,8 +302,8 @@ function createPathDots(scene, path) {
 
     for (let i = 0; i < path.length; i++) {
         const waypoint = path[i];
-        const dotX = waypoint.x * TILE_SIZE + TILE_SIZE / 2;
-        const dotY = waypoint.y * TILE_SIZE + TILE_SIZE / 2;
+        const dotX = waypoint.x * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        const dotY = waypoint.y * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
 
         const dot = scene.add.circle(dotX, dotY, 3, 0xffffff, 0.8);
         dot.setDepth(9);
@@ -334,6 +332,7 @@ function generateMap(scene, mapData) {
     const TILE_GRASS = 17;        // Main grass tile
     const TILE_GRASS_VAR = 19;    // Grass variant (less common)
     const TILE_DIRT = 50;         // Dirt tile
+    const TILE_SAND = CONFIG.TILES.SAND; // Grass with sand
 
     // Debug: Check if tileset is loaded
     if (!scene.textures.exists('tileset')) {
@@ -342,11 +341,11 @@ function generateMap(scene, mapData) {
     }
     console.log('Tileset loaded successfully. Generating map...');
 
-    for (let y = 0; y < WORLD_HEIGHT; y++) {
-        for (let x = 0; x < WORLD_WIDTH; x++) {
+    for (let y = 0; y < CONFIG.WORLD_HEIGHT; y++) {
+        for (let x = 0; x < CONFIG.WORLD_WIDTH; x++) {
             const tile = gameMap[y][x];
-            const posX = x * TILE_SIZE;
-            const posY = y * TILE_SIZE;
+            const posX = x * CONFIG.TILE_SIZE;
+            const posY = y * CONFIG.TILE_SIZE;
 
             let tileIndex;
             if (tile === 'grass') {
@@ -355,6 +354,8 @@ function generateMap(scene, mapData) {
                 tileIndex = TILE_GRASS_VAR;
             } else if (tile === 'dirt') {
                 tileIndex = TILE_DIRT;
+            } else if (tile === 'grass_with_sand') {
+                tileIndex = TILE_SAND;
             } else {
                 tileIndex = TILE_GRASS; // Default to grass
             }
@@ -362,7 +363,7 @@ function generateMap(scene, mapData) {
             // Create sprite from tileset and scale from 128x128 to 32x32
             const tileSprite = scene.add.sprite(posX, posY, 'tileset', tileIndex);
             tileSprite.setOrigin(0, 0);
-            tileSprite.setDisplaySize(TILE_SIZE, TILE_SIZE);
+            tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
             tileSprite.setDepth(0);
         }
     }
@@ -371,11 +372,11 @@ function generateMap(scene, mapData) {
     const gridGraphics = scene.add.graphics();
     gridGraphics.lineStyle(1, 0x000000, 0.1);
     gridGraphics.setDepth(1);
-    for (let x = 0; x <= WORLD_WIDTH; x++) {
-        gridGraphics.lineBetween(x * TILE_SIZE, 0, x * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
+    for (let x = 0; x <= CONFIG.WORLD_WIDTH; x++) {
+        gridGraphics.lineBetween(x * CONFIG.TILE_SIZE, 0, x * CONFIG.TILE_SIZE, CONFIG.WORLD_HEIGHT * CONFIG.TILE_SIZE);
     }
-    for (let y = 0; y <= WORLD_HEIGHT; y++) {
-        gridGraphics.lineBetween(0, y * TILE_SIZE, WORLD_WIDTH * TILE_SIZE, y * TILE_SIZE);
+    for (let y = 0; y <= CONFIG.WORLD_HEIGHT; y++) {
+        gridGraphics.lineBetween(0, y * CONFIG.TILE_SIZE, CONFIG.WORLD_WIDTH * CONFIG.TILE_SIZE, y * CONFIG.TILE_SIZE);
     }
 }
 
@@ -399,8 +400,8 @@ function createResource(scene, resourceData) {
 function handleResourceClick(resource) {
     if (!mainPlayer || mainPlayer.isGathering) return;
 
-    const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
-    const resourcePos = resource.getGridPosition(TILE_SIZE);
+    const playerPos = mainPlayer.getGridPosition();
+    const resourcePos = resource.getGridPosition();
 
     // Calculate Manhattan distance
     const distance = Math.abs(playerPos.x - resourcePos.x) + Math.abs(playerPos.y - resourcePos.y);
@@ -416,8 +417,8 @@ function handleResourceClick(resource) {
             { x: resourcePos.x, y: resourcePos.y - 1 },
             { x: resourcePos.x, y: resourcePos.y + 1 }
         ].filter(tile =>
-            tile.x >= 0 && tile.x < WORLD_WIDTH &&
-            tile.y >= 0 && tile.y < WORLD_HEIGHT
+            tile.x >= 0 && tile.x < CONFIG.WORLD_WIDTH &&
+            tile.y >= 0 && tile.y < CONFIG.WORLD_HEIGHT
         );
 
         // Find closest adjacent tile

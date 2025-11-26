@@ -177,10 +177,10 @@ class Player {
         return false;
     }
 
-    getGridPosition(TILE_SIZE) {
+    getGridPosition() {
         return {
-            x: Math.floor(this.sprite.x / TILE_SIZE),
-            y: Math.floor(this.sprite.y / TILE_SIZE)
+            x: Math.floor(this.sprite.x / CONFIG.TILE_SIZE),
+            y: Math.floor(this.sprite.y / CONFIG.TILE_SIZE)
         };
     }
 

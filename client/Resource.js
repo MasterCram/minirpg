@@ -12,12 +12,12 @@ class Resource {
 
     createSprite() {
         // Use tileset instead of generated graphics
-        // Index 114 for rock, 115 for tree
-        const tileIndex = this.type === 'rock' ? 114 : 115;
+        // Use CONFIG for tile indices
+        const tileIndex = this.type === 'rock' ? CONFIG.TILES.ROCK : CONFIG.TILES.TREE;
 
         this.sprite = this.scene.add.sprite(this.x, this.y, 'tileset', tileIndex);
         this.sprite.setOrigin(0.5, 0.5);
-        this.sprite.setDisplaySize(32, 32);
+        this.sprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
         this.sprite.setInteractive();
         this.sprite.setDepth(5);
         this.sprite.setData('resourceId', this.id);
@@ -33,10 +33,10 @@ class Resource {
         }
     }
 
-    getGridPosition(TILE_SIZE) {
+    getGridPosition() {
         return {
-            x: Math.floor(this.x / TILE_SIZE),
-            y: Math.floor(this.y / TILE_SIZE)
+            x: Math.floor(this.x / CONFIG.TILE_SIZE),
+            y: Math.floor(this.y / CONFIG.TILE_SIZE)
         };
     }
 

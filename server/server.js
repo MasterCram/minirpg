@@ -3,6 +3,14 @@ const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
 
+const CONFIG = require('../shared/config');
+const PathFinder = require('./PathFinder');
+const MapGenerator = require('./MapGenerator');
+const ResourceManager = require('./ResourceManager');
+const PlayerManager = require('./PlayerManager');
+const DroppedItemManager = require('./DroppedItemManager');
+const GameLoop = require('./GameLoop');
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -15,309 +23,57 @@ const io = socketIo(server, {
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, '../client')));
+app.use('/shared', express.static(path.join(__dirname, '../shared')));
 
-const TILE_SIZE = 32;
-const WORLD_WIDTH = 25;
-const WORLD_HEIGHT = 25;
+// Initialize game systems
+const pathFinder = new PathFinder(CONFIG.WORLD_WIDTH, CONFIG.WORLD_HEIGHT);
+const mapGenerator = new MapGenerator();
+const resourceManager = new ResourceManager(pathFinder, io);
+const playerManager = new PlayerManager(io);
+const droppedItemManager = new DroppedItemManager(io);
+const gameLoop = new GameLoop(io, playerManager, resourceManager, droppedItemManager);
 
-const players = {};
-let gameMap = [];
-let resources = [];
-let resourceIdCounter = 0;
-let droppedItems = [];
-let droppedItemIdCounter = 0;
+// Generate initial world
+mapGenerator.generateMap();
+resourceManager.generateResources();
 
-// Server-side movement settings
-const MOVE_SPEED = 150; // Pixels per second (matches client)
-const UPDATE_INTERVAL = 16; // ~60fps server updates
+// Start game loop
+gameLoop.start();
 
-// PathFinder class for server-side pathfinding
-class PathFinder {
-    constructor(worldWidth, worldHeight) {
-        this.worldWidth = worldWidth;
-        this.worldHeight = worldHeight;
-        this.obstacleGrid = [];
-        this.initializeGrid();
-    }
-
-    initializeGrid() {
-        this.obstacleGrid = [];
-        for (let y = 0; y < this.worldHeight; y++) {
-            this.obstacleGrid[y] = [];
-            for (let x = 0; x < this.worldWidth; x++) {
-                this.obstacleGrid[y][x] = 0;
-            }
-        }
-    }
-
-    setObstacle(x, y, isObstacle) {
-        if (x >= 0 && x < this.worldWidth && y >= 0 && y < this.worldHeight) {
-            this.obstacleGrid[y][x] = isObstacle ? 1 : 0;
-        }
-    }
-
-    isObstacle(x, y) {
-        if (x < 0 || x >= this.worldWidth || y < 0 || y >= this.worldHeight) {
-            return true;
-        }
-        return this.obstacleGrid[y][x] === 1;
-    }
-
-    findPath(startX, startY, endX, endY) {
-        // Clamp coordinates to valid range
-        startX = Math.max(0, Math.min(startX, this.worldWidth - 1));
-        startY = Math.max(0, Math.min(startY, this.worldHeight - 1));
-        endX = Math.max(0, Math.min(endX, this.worldWidth - 1));
-        endY = Math.max(0, Math.min(endY, this.worldHeight - 1));
-
-        // If already at destination, return empty path
-        if (startX === endX && startY === endY) {
-            return [];
-        }
-
-        // Check if destination is blocked
-        if (this.isObstacle(endX, endY)) {
-            return null;
-        }
-
-        const openSet = [];
-        const closedSet = new Set();
-        const cameFrom = new Map();
-        const gScore = new Map();
-        const fScore = new Map();
-
-        const startKey = `${startX},${startY}`;
-        const endKey = `${endX},${endY}`;
-
-        openSet.push({ x: startX, y: startY, key: startKey });
-        gScore.set(startKey, 0);
-        fScore.set(startKey, this.heuristic(startX, startY, endX, endY));
-
-        while (openSet.length > 0) {
-            openSet.sort((a, b) => fScore.get(a.key) - fScore.get(b.key));
-            const current = openSet.shift();
-
-            if (current.key === endKey) {
-                return this.reconstructPath(cameFrom, current.key, startX, startY);
-            }
-
-            closedSet.add(current.key);
-
-            const neighbors = [
-                { x: current.x - 1, y: current.y },
-                { x: current.x + 1, y: current.y },
-                { x: current.x, y: current.y - 1 },
-                { x: current.x, y: current.y + 1 }
-            ];
-
-            for (const neighbor of neighbors) {
-                if (neighbor.x < 0 || neighbor.x >= this.worldWidth ||
-                    neighbor.y < 0 || neighbor.y >= this.worldHeight) {
-                    continue;
-                }
-
-                const neighborKey = `${neighbor.x},${neighbor.y}`;
-
-                if (closedSet.has(neighborKey)) {
-                    continue;
-                }
-
-                // Don't treat destination as obstacle, but treat all other obstacles as blocked
-                if (this.obstacleGrid[neighbor.y][neighbor.x] === 1 && neighborKey !== endKey) {
-                    continue;
-                }
-
-                const tentativeGScore = gScore.get(current.key) + 1;
-
-                if (!openSet.find(n => n.key === neighborKey)) {
-                    openSet.push({ x: neighbor.x, y: neighbor.y, key: neighborKey });
-                } else if (tentativeGScore >= (gScore.get(neighborKey) || Infinity)) {
-                    continue;
-                }
-
-                cameFrom.set(neighborKey, current.key);
-                gScore.set(neighborKey, tentativeGScore);
-                fScore.set(neighborKey, tentativeGScore + this.heuristic(neighbor.x, neighbor.y, endX, endY));
-            }
-        }
-
-        return null;
-    }
-
-    heuristic(x1, y1, x2, y2) {
-        return Math.abs(x1 - x2) + Math.abs(y1 - y2);
-    }
-
-    reconstructPath(cameFrom, currentKey, startX, startY) {
-        const path = [];
-        const startKey = `${startX},${startY}`;
-
-        while (currentKey !== startKey) {
-            const [x, y] = currentKey.split(',').map(Number);
-            path.unshift({ x, y });
-            currentKey = cameFrom.get(currentKey);
-        }
-
-        return path;
-    }
-
-    getAdjacentTiles(x, y) {
-        return [
-            { x: x - 1, y: y },
-            { x: x + 1, y: y },
-            { x: x, y: y - 1 },
-            { x: x, y: y + 1 }
-        ].filter(tile =>
-            tile.x >= 0 && tile.x < this.worldWidth &&
-            tile.y >= 0 && tile.y < this.worldHeight
-        );
-    }
-}
-
-// Initialize pathfinder
-const pathFinder = new PathFinder(WORLD_WIDTH, WORLD_HEIGHT);
-
-function generateMap() {
-  console.log('Generating game map...');
-  gameMap = [];
-
-  for (let y = 0; y < WORLD_HEIGHT; y++) {
-    gameMap[y] = [];
-    for (let x = 0; x < WORLD_WIDTH; x++) {
-      const random = Math.random();
-      if (random < 0.85) {
-        // 80% regular grass, 20% grass variant
-        const grassVariant = Math.random();
-        gameMap[y][x] = grassVariant < 0.8 ? 'grass' : 'grass_var';
-      } else {
-        gameMap[y][x] = 'dirt';
-      }
-    }
-  }
-
-  console.log('Map generated successfully!');
-}
-
-function generateResources() {
-  console.log('Generating resources...');
-  resources = [];
-  resourceIdCounter = 0;
-
-  const treeCount = 150;
-  const rockCount = 100;
-  const occupiedTiles = new Set(); // Track occupied tiles
-
-  // Helper function to check if tile is occupied
-  const isTileOccupied = (gridX, gridY) => {
-    return occupiedTiles.has(`${gridX},${gridY}`);
-  };
-
-  // Generate trees
-  let treesGenerated = 0;
-  let attempts = 0;
-  while (treesGenerated < treeCount && attempts < treeCount * 3) {
-    const gridX = Math.floor(Math.random() * WORLD_WIDTH);
-    const gridY = Math.floor(Math.random() * WORLD_HEIGHT);
-
-    if (!isTileOccupied(gridX, gridY)) {
-      const x = gridX * TILE_SIZE + TILE_SIZE / 2;
-      const y = gridY * TILE_SIZE + TILE_SIZE / 2;
-
-      const resource = {
-        id: resourceIdCounter++,
-        type: 'tree',
-        x: x,
-        y: y
-      };
-
-      resources.push(resource);
-      occupiedTiles.add(`${gridX},${gridY}`);
-      pathFinder.setObstacle(gridX, gridY, true);
-      treesGenerated++;
-    }
-    attempts++;
-  }
-
-  // Generate rocks
-  let rocksGenerated = 0;
-  attempts = 0;
-  while (rocksGenerated < rockCount && attempts < rockCount * 3) {
-    const gridX = Math.floor(Math.random() * WORLD_WIDTH);
-    const gridY = Math.floor(Math.random() * WORLD_HEIGHT);
-
-    if (!isTileOccupied(gridX, gridY)) {
-      const x = gridX * TILE_SIZE + TILE_SIZE / 2;
-      const y = gridY * TILE_SIZE + TILE_SIZE / 2;
-
-      const resource = {
-        id: resourceIdCounter++,
-        type: 'rock',
-        x: x,
-        y: y
-      };
-
-      resources.push(resource);
-      occupiedTiles.add(`${gridX},${gridY}`);
-      pathFinder.setObstacle(gridX, gridY, true);
-      rocksGenerated++;
-    }
-    attempts++;
-  }
-
-  console.log(`Generated ${treesGenerated} trees and ${rocksGenerated} rocks`);
-}
-
-generateMap();
-generateResources();
-
+// Socket.io connection handling
 io.on('connection', (socket) => {
   console.log(`Player connected: ${socket.id}`);
 
-  const spawnX = Math.floor(Math.random() * WORLD_WIDTH) * TILE_SIZE + TILE_SIZE / 2;
-  const spawnY = Math.floor(Math.random() * WORLD_HEIGHT) * TILE_SIZE + TILE_SIZE / 2;
+  // Create new player
+  const player = playerManager.createPlayer(socket.id);
 
-  players[socket.id] = {
-    id: socket.id,
-    x: spawnX,
-    y: spawnY,
-    username: `Player${Math.floor(Math.random() * 1000)}`,
-    inventory: Array(28).fill(null), // 28 slots, each can hold one item type (wood/stone)
-    // Server-side movement state
-    path: [],
-    pathIndex: 0,
-    isMoving: false,
-    targetResourceId: null,
-    // Server-side gathering state
-    isGathering: false,
-    gatheringStartTime: null,
-    gatheringResourceId: null,
-    gatheringItemId: null, // For picking up dropped items
-    gatheringDuration: 3000,
-    itemPickupDuration: 1000 // 1 second for item pickup
-  };
+  // Send initial game state to client
+  socket.emit('currentPlayers', playerManager.getAllPlayers());
+  socket.broadcast.emit('newPlayer', player);
 
-  socket.emit('currentPlayers', players);
-  socket.broadcast.emit('newPlayer', players[socket.id]);
-
+  // Handle map request
   socket.on('requestMap', () => {
-    socket.emit('mapData', gameMap);
+    socket.emit('mapData', mapGenerator.getMap());
   });
 
+  // Handle resources request
   socket.on('requestResources', () => {
-    socket.emit('resourcesData', resources);
+    socket.emit('resourcesData', resourceManager.getResources());
   });
 
+  // Handle dropped items request
   socket.on('requestDroppedItems', () => {
-    socket.emit('droppedItemsData', droppedItems);
+    socket.emit('droppedItemsData', droppedItemManager.getDroppedItems());
   });
 
-  // Handle path requests from clients
+  // Handle path requests
   socket.on('requestPath', (data) => {
     const { startX, startY, endX, endY, targetResourceId } = data;
 
     console.log(`Path request from ${socket.id}: (${startX},${startY}) -> (${endX},${endY})`);
 
-    if (!players[socket.id]) return;
+    const player = playerManager.getPlayer(socket.id);
+    if (!player) return;
 
     // Calculate path on server
     const path = pathFinder.findPath(startX, startY, endX, endY);
@@ -335,12 +91,9 @@ io.on('connection', (socket) => {
     console.log(`Path found with ${path.length} waypoints`);
 
     // Set path on server-side player object
-    players[socket.id].path = path;
-    players[socket.id].pathIndex = 0;
-    players[socket.id].isMoving = true;
-    players[socket.id].targetResourceId = targetResourceId || null;
+    playerManager.setPlayerPath(socket.id, path, targetResourceId);
 
-    // Broadcast path to all clients so they can show visual feedback
+    // Broadcast path to all clients
     io.emit('playerPath', {
       playerId: socket.id,
       path: path,
@@ -348,23 +101,21 @@ io.on('connection', (socket) => {
     });
   });
 
-  // playerMovement is now handled server-side in the game loop
-
-  // Handle gathering request from client
+  // Handle gathering request
   socket.on('startGathering', (data) => {
     const { resourceId } = data;
-    const player = players[socket.id];
+    const player = playerManager.getPlayer(socket.id);
 
     if (!player || player.isGathering) return;
 
-    const resource = resources.find(r => r.id === resourceId);
+    const resource = resourceManager.findResource(resourceId);
     if (!resource) return;
 
     // Verify player is adjacent to resource
-    const playerGridX = Math.floor(player.x / TILE_SIZE);
-    const playerGridY = Math.floor(player.y / TILE_SIZE);
-    const resourceGridX = Math.floor(resource.x / TILE_SIZE);
-    const resourceGridY = Math.floor(resource.y / TILE_SIZE);
+    const playerGridX = Math.floor(player.x / CONFIG.TILE_SIZE);
+    const playerGridY = Math.floor(player.y / CONFIG.TILE_SIZE);
+    const resourceGridX = Math.floor(resource.x / CONFIG.TILE_SIZE);
+    const resourceGridY = Math.floor(resource.y / CONFIG.TILE_SIZE);
 
     const distance = Math.abs(playerGridX - resourceGridX) + Math.abs(playerGridY - resourceGridY);
 
@@ -374,67 +125,39 @@ io.on('connection', (socket) => {
     }
 
     // Start gathering
-    player.isGathering = true;
-    player.gatheringStartTime = Date.now();
-    player.gatheringResourceId = resourceId;
-    player.isMoving = false;
-    player.path = [];
-
-    // Broadcast to all clients
-    io.emit('playerStartedGathering', {
-      playerId: socket.id,
-      resourceId: resourceId,
-      duration: player.gatheringDuration
-    });
-
+    playerManager.startGathering(socket.id, resourceId, CONFIG.GATHERING_DURATION);
     console.log(`${socket.id} started gathering resource ${resourceId}`);
   });
 
-  // Handle dropping items from inventory
+  // Handle dropping items
   socket.on('dropItem', (data) => {
     const { slotIndex } = data;
-    const player = players[socket.id];
+    const player = playerManager.getPlayer(socket.id);
 
-    if (!player || slotIndex < 0 || slotIndex >= 28) return;
-    if (player.inventory[slotIndex] === null) return;
+    if (!player) return;
 
-    const itemType = player.inventory[slotIndex];
-    player.inventory[slotIndex] = null;
-
-    // Create dropped item at player position, snapped to tile center
-    const gridX = Math.floor(player.x / TILE_SIZE);
-    const gridY = Math.floor(player.y / TILE_SIZE);
-    const droppedItem = {
-      id: droppedItemIdCounter++,
-      type: itemType,
-      x: gridX * TILE_SIZE + TILE_SIZE / 2,
-      y: gridY * TILE_SIZE + TILE_SIZE / 2
-    };
-
-    droppedItems.push(droppedItem);
-
-    // Broadcast to all clients
-    io.emit('itemDropped', droppedItem);
-    io.to(socket.id).emit('inventoryUpdate', player.inventory);
-
-    console.log(`${socket.id} dropped ${itemType} at (${player.x}, ${player.y})`);
+    const itemType = playerManager.removeItemFromInventory(socket.id, slotIndex);
+    if (itemType) {
+      droppedItemManager.dropItem(itemType, player.x, player.y);
+      console.log(`${socket.id} dropped ${itemType} at (${player.x}, ${player.y})`);
+    }
   });
 
-  // Handle picking up dropped items
+  // Handle picking up items
   socket.on('pickupItem', (data) => {
     const { itemId } = data;
-    const player = players[socket.id];
+    const player = playerManager.getPlayer(socket.id);
 
     if (!player || player.isGathering) return;
 
-    const item = droppedItems.find(item => item.id === itemId);
+    const item = droppedItemManager.findItem(itemId);
     if (!item) return;
 
     // Check distance
-    const playerGridX = Math.floor(player.x / TILE_SIZE);
-    const playerGridY = Math.floor(player.y / TILE_SIZE);
-    const itemGridX = Math.floor(item.x / TILE_SIZE);
-    const itemGridY = Math.floor(item.y / TILE_SIZE);
+    const playerGridX = Math.floor(player.x / CONFIG.TILE_SIZE);
+    const playerGridY = Math.floor(player.y / CONFIG.TILE_SIZE);
+    const itemGridX = Math.floor(item.x / CONFIG.TILE_SIZE);
+    const itemGridY = Math.floor(item.y / CONFIG.TILE_SIZE);
 
     const distance = Math.abs(playerGridX - itemGridX) + Math.abs(playerGridY - itemGridY);
 
@@ -450,45 +173,25 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Start pickup (gathering-style)
-    player.isGathering = true;
-    player.gatheringStartTime = Date.now();
-    player.gatheringItemId = itemId;
-    player.isMoving = false;
-    player.path = [];
-
-    // Broadcast to all clients
-    io.emit('playerStartedGathering', {
-      playerId: socket.id,
-      resourceId: itemId, // Using resourceId field for compatibility
-      duration: player.itemPickupDuration
-    });
-
+    // Start pickup
+    playerManager.startPickingUpItem(socket.id, itemId, CONFIG.ITEM_PICKUP_DURATION);
     console.log(`${socket.id} started picking up ${item.type}`);
   });
 
-  // Handle swapping items in inventory
+  // Handle swapping items
   socket.on('swapItems', (data) => {
     const { fromSlot, toSlot } = data;
-    const player = players[socket.id];
+    const success = playerManager.swapInventoryItems(socket.id, fromSlot, toSlot);
 
-    if (!player) return;
-    if (fromSlot < 0 || fromSlot >= 28 || toSlot < 0 || toSlot >= 28) return;
-
-    // Swap items
-    const temp = player.inventory[fromSlot];
-    player.inventory[fromSlot] = player.inventory[toSlot];
-    player.inventory[toSlot] = temp;
-
-    // Send updated inventory
-    io.to(socket.id).emit('inventoryUpdate', player.inventory);
-
-    console.log(`${socket.id} swapped items: slot ${fromSlot} <-> slot ${toSlot}`);
+    if (success) {
+      console.log(`${socket.id} swapped items: slot ${fromSlot} <-> slot ${toSlot}`);
+    }
   });
 
+  // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
-    delete players[socket.id];
+    playerManager.removePlayer(socket.id);
     io.emit('playerDisconnected', socket.id);
   });
 });
@@ -496,222 +199,5 @@ io.on('connection', (socket) => {
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Open http://localhost:${PORT} in your browser`);
-  console.log(`Map size: ${WORLD_WIDTH}x${WORLD_HEIGHT} tiles (${WORLD_WIDTH * TILE_SIZE}x${WORLD_HEIGHT * TILE_SIZE} pixels)`);
+  console.log(`Map size: ${CONFIG.WORLD_WIDTH}x${CONFIG.WORLD_HEIGHT} tiles (${CONFIG.WORLD_WIDTH * CONFIG.TILE_SIZE}x${CONFIG.WORLD_HEIGHT * CONFIG.TILE_SIZE} pixels)`);
 });
-
-// Server-side game loop for player movement simulation
-let lastUpdateTime = Date.now();
-
-setInterval(() => {
-  const currentTime = Date.now();
-  const deltaTime = currentTime - lastUpdateTime;
-  lastUpdateTime = currentTime;
-
-  let positionUpdates = [];
-  let gatheringUpdates = [];
-
-  // Update all players
-  Object.keys(players).forEach(playerId => {
-    const player = players[playerId];
-
-    // Update gathering progress (for both resources and items)
-    if (player.isGathering && player.gatheringStartTime !== null) {
-      const isPickingUpItem = player.gatheringItemId !== null;
-      const duration = isPickingUpItem ? player.itemPickupDuration : player.gatheringDuration;
-      const elapsed = currentTime - player.gatheringStartTime;
-      const progress = Math.min(elapsed / duration, 1);
-
-      gatheringUpdates.push({
-        playerId: playerId,
-        resourceId: isPickingUpItem ? player.gatheringItemId : player.gatheringResourceId,
-        progress: progress
-      });
-
-      // Check if gathering/pickup is complete
-      if (progress >= 1) {
-        if (isPickingUpItem) {
-          // Handle item pickup completion
-          const itemIndex = droppedItems.findIndex(item => item.id === player.gatheringItemId);
-
-          if (itemIndex !== -1) {
-            const item = droppedItems[itemIndex];
-
-            // Add to inventory
-            const emptySlot = player.inventory.findIndex(slot => slot === null);
-            if (emptySlot !== -1) {
-              player.inventory[emptySlot] = item.type;
-
-              // Remove from dropped items
-              droppedItems.splice(itemIndex, 1);
-
-              // Broadcast item removal
-              io.emit('itemPickedUp', { itemId: player.gatheringItemId });
-
-              // Send inventory update
-              io.to(playerId).emit('inventoryUpdate', player.inventory);
-
-              console.log(`${playerId} picked up ${item.type}`);
-            }
-          }
-
-          // Reset gathering state
-          player.isGathering = false;
-          player.gatheringStartTime = null;
-          player.gatheringItemId = null;
-
-          // Broadcast gathering complete
-          io.emit('playerFinishedGathering', { playerId: playerId });
-        } else {
-          // Handle resource gathering completion
-          const resourceIndex = resources.findIndex(r => r.id === player.gatheringResourceId);
-
-          if (resourceIndex !== -1) {
-            const resource = resources[resourceIndex];
-
-            // Remove obstacle from pathfinder
-            const gridX = Math.floor(resource.x / TILE_SIZE);
-            const gridY = Math.floor(resource.y / TILE_SIZE);
-            pathFinder.setObstacle(gridX, gridY, false);
-
-            // Update inventory - add items to first available slots
-            let itemsToAdd = [];
-            if (resource.type === 'tree') {
-              itemsToAdd = ['wood', 'wood']; // Trees give 2 woods
-            } else if (resource.type === 'rock') {
-              itemsToAdd = ['stone']; // Rocks give 1 stone
-            }
-
-            for (const item of itemsToAdd) {
-              const emptySlot = player.inventory.findIndex(slot => slot === null);
-              if (emptySlot !== -1) {
-                player.inventory[emptySlot] = item;
-              }
-            }
-
-            // Remove resource
-            resources.splice(resourceIndex, 1);
-
-            // Broadcast resource removal
-            io.emit('resourceGathered', { resourceId: player.gatheringResourceId });
-
-            // Send inventory update
-            io.to(playerId).emit('inventoryUpdate', player.inventory);
-
-            console.log(`${playerId} gathered ${resource.type}. New inventory:`, player.inventory);
-
-            // Respawn resource after 5 seconds
-            setTimeout(() => {
-              let respawned = false;
-              let attempts = 0;
-
-              while (!respawned && attempts < 100) {
-                const gridX = Math.floor(Math.random() * WORLD_WIDTH);
-                const gridY = Math.floor(Math.random() * WORLD_HEIGHT);
-
-                // Check if tile is already occupied
-                const occupied = resources.some(r => {
-                  const rGridX = Math.floor(r.x / TILE_SIZE);
-                  const rGridY = Math.floor(r.y / TILE_SIZE);
-                  return rGridX === gridX && rGridY === gridY;
-                });
-
-                if (!occupied) {
-                  const newResource = {
-                    id: resourceIdCounter++,
-                    type: resource.type,
-                    x: gridX * TILE_SIZE + TILE_SIZE / 2,
-                    y: gridY * TILE_SIZE + TILE_SIZE / 2
-                  };
-                  resources.push(newResource);
-                  pathFinder.setObstacle(gridX, gridY, true);
-                  io.emit('resourcesData', [newResource]);
-                  console.log(`Respawned ${resource.type} at (${newResource.x}, ${newResource.y})`);
-                  respawned = true;
-                }
-                attempts++;
-              }
-            }, 5000);
-          }
-
-          // Reset gathering state
-          player.isGathering = false;
-          player.gatheringStartTime = null;
-          player.gatheringResourceId = null;
-
-          // Broadcast gathering complete
-          io.emit('playerFinishedGathering', { playerId: playerId });
-        }
-      }
-    }
-
-    // Update movement
-    if (player.isMoving && player.path.length > 0 && player.pathIndex < player.path.length) {
-      const target = player.path[player.pathIndex];
-      const targetX = target.x * TILE_SIZE + TILE_SIZE / 2;
-      const targetY = target.y * TILE_SIZE + TILE_SIZE / 2;
-
-      const distance = Math.sqrt(
-        Math.pow(targetX - player.x, 2) + Math.pow(targetY - player.y, 2)
-      );
-
-      const speed = (MOVE_SPEED * deltaTime) / 1000;
-
-      if (distance <= speed || distance < 1) {
-        // Snap to exact position
-        player.x = targetX;
-        player.y = targetY;
-        player.pathIndex++;
-
-        // Check if path is complete
-        if (player.pathIndex >= player.path.length) {
-          player.isMoving = false;
-          player.path = [];
-          player.pathIndex = 0;
-
-          // Handle automatic resource gathering if applicable
-          if (player.targetResourceId !== null) {
-            const resourceId = player.targetResourceId;
-            player.targetResourceId = null;
-
-            const resource = resources.find(r => r.id === resourceId);
-            if (resource) {
-              // Start gathering automatically
-              player.isGathering = true;
-              player.gatheringStartTime = Date.now();
-              player.gatheringResourceId = resourceId;
-
-              io.emit('playerStartedGathering', {
-                playerId: playerId,
-                resourceId: resourceId,
-                duration: player.gatheringDuration
-              });
-            }
-          }
-        }
-      } else {
-        // Move toward target
-        const angle = Math.atan2(targetY - player.y, targetX - player.x);
-        player.x += Math.cos(angle) * speed;
-        player.y += Math.sin(angle) * speed;
-      }
-
-      // Add to position updates
-      positionUpdates.push({
-        id: playerId,
-        x: player.x,
-        y: player.y,
-        pathIndex: player.pathIndex
-      });
-    }
-  });
-
-  // Broadcast all position updates to all clients
-  if (positionUpdates.length > 0) {
-    io.emit('playersPositionUpdate', positionUpdates);
-  }
-
-  // Broadcast gathering progress updates
-  if (gatheringUpdates.length > 0) {
-    io.emit('gatheringProgressUpdate', gatheringUpdates);
-  }
-}, UPDATE_INTERVAL);
