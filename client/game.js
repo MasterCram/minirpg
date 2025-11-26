@@ -53,7 +53,7 @@ function preload() {
 function create() {
     currentScene = this;
 
-    this.physics.world.setBounds(0, 0, CONFIG.CONFIG.WORLD_WIDTH * CONFIG.CONFIG.TILE_SIZE, CONFIG.CONFIG.WORLD_HEIGHT * CONFIG.CONFIG.TILE_SIZE);
+    this.physics.world.setBounds(0, 0, CONFIG.WORLD_WIDTH * CONFIG.TILE_SIZE, CONFIG.WORLD_HEIGHT * CONFIG.TILE_SIZE);
 
     // Initialize systems
     // Note: PathFinder is now server-side for authoritative movement
@@ -269,8 +269,8 @@ function setupInputHandlers(scene) {
         const worldX = pointer.worldX;
         const worldY = pointer.worldY;
 
-        const gridX = Math.floor(worldX / CONFIG.CONFIG.TILE_SIZE);
-        const gridY = Math.floor(worldY / CONFIG.CONFIG.TILE_SIZE);
+        const gridX = Math.floor(worldX / CONFIG.TILE_SIZE);
+        const gridY = Math.floor(worldY / CONFIG.TILE_SIZE);
 
         console.log('Click at grid:', gridX, gridY);
 
