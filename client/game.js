@@ -202,7 +202,9 @@ function createPathDots(scene, path) {
 }
 
 function clearPathDots() {
-    pathDots.forEach(dot => dot.destroy());
+    pathDots.forEach(dot => {
+        if (dot) dot.destroy();
+    });
     pathDots = [];
 }
 
