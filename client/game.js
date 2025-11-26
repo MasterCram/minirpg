@@ -20,7 +20,10 @@ const config = {
         preload: preload,
         create: create,
         update: update
-    }
+    },
+    disableContextMenu: true,
+    // Keep game running when tab is not focused
+    pauseOnBlur: false
 };
 
 const game = new Phaser.Game(config);
