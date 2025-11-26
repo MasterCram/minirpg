@@ -197,13 +197,8 @@ class Player {
     }
 
     updatePosition(x, y) {
-        this.scene.tweens.add({
-            targets: this.sprite,
-            x: x,
-            y: y,
-            duration: 200,
-            ease: 'Linear'
-        });
+        // Directly set position for other players to ensure they update even when tab is inactive
+        this.sprite.setPosition(x, y);
     }
 
     updateInventory(inventory) {

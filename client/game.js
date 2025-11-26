@@ -93,7 +93,10 @@ function setupSocketConnection(scene) {
                 if (players[id].inventory) {
                     inventoryUI.update(players[id].inventory);
                 }
-                scene.cameras.main.startFollow(mainPlayer.sprite, true, 0.1, 0.1);
+
+                // Center camera on player with smooth following
+                scene.cameras.main.startFollow(mainPlayer.sprite, true, 0.2, 0.2);
+                scene.cameras.main.setFollowOffset(0, 0); // Center the camera exactly on player
 
                 socket.emit('requestMap');
                 socket.emit('requestResources');
