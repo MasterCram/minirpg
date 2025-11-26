@@ -17,8 +17,8 @@ const PORT = process.env.PORT || 3000;
 app.use(express.static(path.join(__dirname, '../client')));
 
 const TILE_SIZE = 32;
-const WORLD_WIDTH = 100;
-const WORLD_HEIGHT = 100;
+const WORLD_WIDTH = 25;
+const WORLD_HEIGHT = 25;
 
 const players = {};
 let gameMap = [];

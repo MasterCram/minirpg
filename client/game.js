@@ -1,6 +1,6 @@
 const TILE_SIZE = 32;
-const WORLD_WIDTH = 100;
-const WORLD_HEIGHT = 100;
+const WORLD_WIDTH = 25;
+const WORLD_HEIGHT = 25;
 
 const config = {
     type: Phaser.AUTO,

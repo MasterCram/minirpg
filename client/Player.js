@@ -12,7 +12,7 @@ class Player {
         this.isGathering = false;
         this.targetResource = null;
         this.gatheringProgress = null;
-        this.moveSpeed = 4; // Tiles per second
+        this.moveSpeed = 150; // Pixels per second (constant speed)
 
         this.createSprite(playerData.x, playerData.y);
     }
@@ -57,9 +57,11 @@ class Player {
     }
 
     stopMovement() {
+        console.log('stopMovement called - current state:', {isMoving: this.isMoving, pathLength: this.currentPath.length, pathIndex: this.pathIndex});
         this.isMoving = false;
         this.currentPath = [];
         this.pathIndex = 0;
+        console.log('stopMovement complete - new state:', {isMoving: this.isMoving, pathLength: this.currentPath.length, pathIndex: this.pathIndex});
     }
 
     startGathering(resourceId) {
@@ -142,10 +144,9 @@ class Player {
                 targetY
             );
 
-            // Fixed movement speed: pixels per second, converted to pixels per frame
-            // moveSpeed is 4 tiles/sec = 128 pixels/sec
-            const pixelsPerSecond = this.moveSpeed * TILE_SIZE;
-            const speed = (pixelsPerSecond * delta) / 1000;
+            // Convert speed from pixels/second to pixels/frame
+            // delta is in milliseconds, so divide by 1000 to get seconds
+            const speed = (this.moveSpeed * delta) / 1000;
 
             // If very close or will overshoot, snap to exact position
             if (distance <= speed || distance < 1) {
@@ -163,6 +164,7 @@ class Player {
                 this.pathIndex++;
 
                 if (this.pathIndex >= this.currentPath.length) {
+                    console.log('Path completed! Stopping movement.');
                     this.stopMovement();
                     return true; // Path completed
                 }
