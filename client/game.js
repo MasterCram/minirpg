@@ -67,16 +67,29 @@ function create() {
 }
 
 function setupSocketConnection(scene) {
+    console.log('Setting up socket connection...');
     socket = io('http://localhost:3000');
 
+    socket.on('connect', () => {
+        console.log('Socket connected! ID:', socket.id);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Socket disconnected!');
+    });
+
     socket.on('mapData', (mapData) => {
+        console.log('Received map data:', mapData.length, 'rows');
         generateMap(scene, mapData);
     });
 
     socket.on('currentPlayers', (players) => {
+        console.log('Received currentPlayers:', Object.keys(players).length, 'players');
         Object.keys(players).forEach((id) => {
             if (id === socket.id) {
+                console.log('Creating main player:', players[id]);
                 mainPlayer = new Player(scene, players[id], true);
+                console.log('Main player created successfully!', mainPlayer);
                 if (players[id].inventory) {
                     inventoryUI.update(players[id].inventory);
                 }
@@ -85,6 +98,7 @@ function setupSocketConnection(scene) {
                 socket.emit('requestMap');
                 socket.emit('requestResources');
             } else {
+                console.log('Creating other player:', id);
                 otherPlayers[id] = new Player(scene, players[id], false);
             }
         });
