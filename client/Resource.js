@@ -12,8 +12,8 @@ class Resource {
 
     createSprite() {
         // Use tileset instead of generated graphics
-        // Index 130 for rock, 131 for tree
-        const tileIndex = this.type === 'rock' ? 130 : 131;
+        // Index 114 for rock, 115 for tree
+        const tileIndex = this.type === 'rock' ? 114 : 115;
 
         this.sprite = this.scene.add.sprite(this.x, this.y, 'tileset', tileIndex);
         this.sprite.setOrigin(0.5, 0.5);

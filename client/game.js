@@ -38,7 +38,6 @@ let droppedItems = {};
 let inventoryUI;
 let gameMap = [];
 let pathDots = []; // Visual path indicators
-let pickupCooldowns = {}; // Track 1-second delay for each dropped item
 
 function preload() {
     // Load tileset - 16x16 grid, each tile is 128x128 pixels
@@ -64,6 +63,11 @@ function create() {
     inventoryUI.setDropItemCallback((slotIndex) => {
         if (socket) {
             socket.emit('dropItem', { slotIndex });
+        }
+    });
+    inventoryUI.setSwapItemsCallback((fromSlot, toSlot) => {
+        if (socket) {
+            socket.emit('swapItems', { fromSlot, toSlot });
         }
     });
 
@@ -469,28 +473,18 @@ function createDroppedItem(scene, itemData) {
 
     const item = new DroppedItem(scene, itemData);
 
-    // Set click handler with 1-second delay
+    // Set click handler
     item.setClickHandler((clickedItem) => {
         handleDroppedItemClick(clickedItem);
     });
 
     droppedItems[itemData.id] = item;
-
-    // Add 1-second cooldown before this item can be picked up
-    pickupCooldowns[itemData.id] = Date.now() + 1000;
 }
 
 function handleDroppedItemClick(item) {
-    if (!mainPlayer || mainPlayer.isGathering || mainPlayer.isMoving) return;
+    if (!mainPlayer || mainPlayer.isGathering) return;
 
-    // Check 1-second cooldown
-    const now = Date.now();
-    if (pickupCooldowns[item.id] && now < pickupCooldowns[item.id]) {
-        console.log('Item pickup on cooldown');
-        return;
-    }
-
-    // Request pickup from server
+    // Request pickup from server (will start gathering animation)
     socket.emit('pickupItem', { itemId: item.id });
 }
 
@@ -498,7 +492,6 @@ function removeDroppedItem(itemId) {
     if (droppedItems[itemId]) {
         droppedItems[itemId].destroy();
         delete droppedItems[itemId];
-        delete pickupCooldowns[itemId];
     }
 }
 
