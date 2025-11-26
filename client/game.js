@@ -167,7 +167,7 @@ function setupSocketConnection(scene) {
                 createPathDots(scene, path);
             }
 
-            // Set path for the player
+            // Set path for the player (for visual reference, actual movement is server-driven)
             player.setPath(path);
 
             // If this is for main player and targeting a resource
@@ -176,6 +176,29 @@ function setupSocketConnection(scene) {
             }
         } else if (path === null) {
             console.log('No path found - blocked');
+        }
+    });
+
+    // Listen for position updates from server (server-authoritative)
+    socket.on('playersPositionUpdate', (updates) => {
+        updates.forEach(update => {
+            const player = update.id === socket.id ? mainPlayer : otherPlayers[update.id];
+            if (player) {
+                player.updatePosition(update.x, update.y);
+
+                // Update path dots for main player
+                if (update.id === socket.id && update.pathIndex !== undefined) {
+                    removePathDot(update.pathIndex);
+                }
+            }
+        });
+    });
+
+    // Listen for gathering start event from server
+    socket.on('startGathering', (data) => {
+        if (mainPlayer && data.resourceId !== null && data.resourceId !== undefined) {
+            clearPathDots();
+            mainPlayer.startGathering(data.resourceId);
         }
     });
 }
@@ -390,43 +413,14 @@ function removeResource(resourceId) {
 function update(time, delta) {
     if (!mainPlayer) return;
 
-    // Update main player
+    // Update gathering progress (only local visual effect)
     mainPlayer.updateGathering((resourceId) => {
         socket.emit('gatherResource', resourceId);
     });
 
-    const pathCompleted = mainPlayer.update(
-        delta,
-        TILE_SIZE,
-        (x, y) => {
-            socket.emit('playerMovement', { x, y });
-        },
-        (waypointIndex) => {
-            removePathDot(waypointIndex);
-        }
-    );
+    // Update name text positions for all players (server handles movement)
+    mainPlayer.nameText.setPosition(mainPlayer.sprite.x, mainPlayer.sprite.y - 25);
 
-    // If path completed, clear any remaining dots
-    if (pathCompleted) {
-        clearPathDots();
-
-        // If player has a target resource, start gathering
-        if (mainPlayer.targetResource) {
-            const targetResource = resources[mainPlayer.targetResource];
-            if (targetResource && !targetResource.isDestroyed()) {
-                const playerPos = mainPlayer.getGridPosition(TILE_SIZE);
-                const resourcePos = targetResource.getGridPosition(TILE_SIZE);
-                const distance = Math.abs(playerPos.x - resourcePos.x) + Math.abs(playerPos.y - resourcePos.y);
-
-                if (distance <= 1) {
-                    mainPlayer.startGathering(mainPlayer.targetResource);
-                }
-            }
-            mainPlayer.targetResource = null;
-        }
-    }
-
-    // Update other players
     Object.values(otherPlayers).forEach(player => {
         player.nameText.setPosition(player.sprite.x, player.sprite.y - 25);
     });

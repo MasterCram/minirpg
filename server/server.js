@@ -25,6 +25,10 @@ let gameMap = [];
 let resources = [];
 let resourceIdCounter = 0;
 
+// Server-side movement settings
+const MOVE_SPEED = 150; // Pixels per second (matches client)
+const UPDATE_INTERVAL = 16; // ~60fps server updates
+
 // PathFinder class for server-side pathfinding
 class PathFinder {
     constructor(worldWidth, worldHeight) {
@@ -258,7 +262,12 @@ io.on('connection', (socket) => {
     inventory: {
       wood: 0,
       stone: 0
-    }
+    },
+    // Server-side movement state
+    path: [],
+    pathIndex: 0,
+    isMoving: false,
+    targetResourceId: null
   };
 
   socket.emit('currentPlayers', players);
@@ -278,24 +287,30 @@ io.on('connection', (socket) => {
 
     console.log(`Path request from ${socket.id}: (${startX},${startY}) -> (${endX},${endY})`);
 
+    if (!players[socket.id]) return;
+
     // Calculate path on server
     const path = pathFinder.findPath(startX, startY, endX, endY);
 
     if (path === null) {
       console.log('No path found - obstacle blocking');
-      socket.emit('pathResult', { path: null, targetResourceId });
       return;
     }
 
     if (path.length === 0) {
       console.log('Already at destination');
-      socket.emit('pathResult', { path: [], targetResourceId });
       return;
     }
 
     console.log(`Path found with ${path.length} waypoints`);
 
-    // Broadcast path to all clients so they all see the same movement
+    // Set path on server-side player object
+    players[socket.id].path = path;
+    players[socket.id].pathIndex = 0;
+    players[socket.id].isMoving = true;
+    players[socket.id].targetResourceId = targetResourceId || null;
+
+    // Broadcast path to all clients so they can show visual feedback
     io.emit('playerPath', {
       playerId: socket.id,
       path: path,
@@ -303,18 +318,7 @@ io.on('connection', (socket) => {
     });
   });
 
-  socket.on('playerMovement', (movementData) => {
-    if (players[socket.id]) {
-      players[socket.id].x = movementData.x;
-      players[socket.id].y = movementData.y;
-
-      socket.broadcast.emit('playerMoved', {
-        id: socket.id,
-        x: movementData.x,
-        y: movementData.y
-      });
-    }
-  });
+  // playerMovement is now handled server-side in the game loop
 
   socket.on('gatherResource', (resourceId) => {
     const resourceIndex = resources.findIndex(r => r.id === resourceId);
@@ -373,3 +377,72 @@ server.listen(PORT, () => {
   console.log(`Open http://localhost:${PORT} in your browser`);
   console.log(`Map size: ${WORLD_WIDTH}x${WORLD_HEIGHT} tiles (${WORLD_WIDTH * TILE_SIZE}x${WORLD_HEIGHT * TILE_SIZE} pixels)`);
 });
+
+// Server-side game loop for player movement simulation
+let lastUpdateTime = Date.now();
+
+setInterval(() => {
+  const currentTime = Date.now();
+  const deltaTime = currentTime - lastUpdateTime;
+  lastUpdateTime = currentTime;
+
+  let positionUpdates = [];
+
+  // Update all moving players
+  Object.keys(players).forEach(playerId => {
+    const player = players[playerId];
+
+    if (player.isMoving && player.path.length > 0 && player.pathIndex < player.path.length) {
+      const target = player.path[player.pathIndex];
+      const targetX = target.x * TILE_SIZE + TILE_SIZE / 2;
+      const targetY = target.y * TILE_SIZE + TILE_SIZE / 2;
+
+      const distance = Math.sqrt(
+        Math.pow(targetX - player.x, 2) + Math.pow(targetY - player.y, 2)
+      );
+
+      const speed = (MOVE_SPEED * deltaTime) / 1000;
+
+      if (distance <= speed || distance < 1) {
+        // Snap to exact position
+        player.x = targetX;
+        player.y = targetY;
+        player.pathIndex++;
+
+        // Check if path is complete
+        if (player.pathIndex >= player.path.length) {
+          player.isMoving = false;
+          player.path = [];
+          player.pathIndex = 0;
+
+          // Handle resource gathering if applicable
+          if (player.targetResourceId !== null) {
+            const resourceId = player.targetResourceId;
+            player.targetResourceId = null;
+
+            // Emit gathering event to client
+            io.to(playerId).emit('startGathering', { resourceId });
+          }
+        }
+      } else {
+        // Move toward target
+        const angle = Math.atan2(targetY - player.y, targetX - player.x);
+        player.x += Math.cos(angle) * speed;
+        player.y += Math.sin(angle) * speed;
+      }
+
+      // Add to position updates
+      positionUpdates.push({
+        id: playerId,
+        x: player.x,
+        y: player.y,
+        pathIndex: player.pathIndex
+      });
+    }
+  });
+
+  // Broadcast all position updates to all clients
+  if (positionUpdates.length > 0) {
+    io.emit('playersPositionUpdate', positionUpdates);
+  }
+}, UPDATE_INTERVAL);
