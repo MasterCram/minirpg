@@ -34,7 +34,6 @@ let currentScene;
 let mainPlayer;
 let otherPlayers = {};
 let resources = {};
-let pathFinder;
 let inventoryUI;
 let gameMap = [];
 let pathDots = []; // Visual path indicators
@@ -59,7 +58,7 @@ function create() {
     this.physics.world.setBounds(0, 0, WORLD_WIDTH * TILE_SIZE, WORLD_HEIGHT * TILE_SIZE);
 
     // Initialize systems
-    pathFinder = new PathFinder(WORLD_WIDTH, WORLD_HEIGHT);
+    // Note: PathFinder is now server-side for authoritative movement
     inventoryUI = new InventoryUI();
 
     // Setup socket connection
@@ -148,6 +147,37 @@ function setupSocketConnection(scene) {
         }
         inventoryUI.update(newInventory);
     });
+
+    // Listen for path updates from server
+    socket.on('playerPath', (data) => {
+        const { playerId, path, targetResourceId } = data;
+        console.log(`Received path for player ${playerId}:`, path?.length, 'waypoints');
+
+        const player = playerId === socket.id ? mainPlayer : otherPlayers[playerId];
+
+        if (!player) {
+            console.log('Player not found:', playerId);
+            return;
+        }
+
+        if (path && path.length > 0) {
+            // Clear and create path dots only for main player
+            if (playerId === socket.id) {
+                clearPathDots();
+                createPathDots(scene, path);
+            }
+
+            // Set path for the player
+            player.setPath(path);
+
+            // If this is for main player and targeting a resource
+            if (playerId === socket.id && targetResourceId !== null && targetResourceId !== undefined) {
+                player.targetResource = targetResourceId;
+            }
+        } else if (path === null) {
+            console.log('No path found - blocked');
+        }
+    });
 }
 
 function setupInputHandlers(scene) {
@@ -177,18 +207,15 @@ function setupInputHandlers(scene) {
                 return;
             }
 
-            const path = pathFinder.findPath(playerPos.x, playerPos.y, gridX, gridY);
-            console.log('Path found:', path?.length, 'waypoints');
-
-            // Only set path if it exists and has waypoints
-            if (path && path.length > 0) {
-                clearPathDots();
-                createPathDots(scene, path);
-                mainPlayer.setPath(path);
-                console.log('Path set successfully');
-            } else if (path === null) {
-                console.log('No path found to destination - obstacle or blocked');
-            }
+            // Request path from server
+            console.log('Requesting path from server...');
+            socket.emit('requestPath', {
+                startX: playerPos.x,
+                startY: playerPos.y,
+                endX: gridX,
+                endY: gridY,
+                targetResourceId: null
+            });
         }
     });
 }
@@ -279,10 +306,8 @@ function createResource(scene, resourceData) {
     }
 
     const resource = new Resource(scene, resourceData);
-    const gridPos = resource.getGridPosition(TILE_SIZE);
 
-    // Mark as obstacle in pathfinder
-    pathFinder.setObstacle(gridPos.x, gridPos.y, true);
+    // Note: Obstacles are now managed server-side
 
     // Set click handler for resource
     resource.setClickHandler((clickedResource) => {
@@ -305,19 +330,26 @@ function handleResourceClick(resource) {
         // Adjacent to resource, start gathering immediately
         mainPlayer.startGathering(resource.id);
     } else {
-        // Find nearest adjacent tile to resource
-        const adjacentTiles = pathFinder.getAdjacentTiles(resourcePos.x, resourcePos.y);
+        // Get adjacent tiles (simple calculation, no pathfinding needed)
+        const adjacentTiles = [
+            { x: resourcePos.x - 1, y: resourcePos.y },
+            { x: resourcePos.x + 1, y: resourcePos.y },
+            { x: resourcePos.x, y: resourcePos.y - 1 },
+            { x: resourcePos.x, y: resourcePos.y + 1 }
+        ].filter(tile =>
+            tile.x >= 0 && tile.x < WORLD_WIDTH &&
+            tile.y >= 0 && tile.y < WORLD_HEIGHT
+        );
 
+        // Find closest adjacent tile
         let closestTile = null;
         let minDistance = Infinity;
 
         for (const tile of adjacentTiles) {
-            if (!pathFinder.isObstacle(tile.x, tile.y)) {
-                const dist = Math.abs(playerPos.x - tile.x) + Math.abs(playerPos.y - tile.y);
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    closestTile = tile;
-                }
+            const dist = Math.abs(playerPos.x - tile.x) + Math.abs(playerPos.y - tile.y);
+            if (dist < minDistance) {
+                minDistance = dist;
+                closestTile = tile;
             }
         }
 
@@ -329,20 +361,17 @@ function handleResourceClick(resource) {
                 return;
             }
 
-            const path = pathFinder.findPath(playerPos.x, playerPos.y, closestTile.x, closestTile.y);
-            if (path && path.length > 0) {
-                clearPathDots();
-                createPathDots(currentScene, path);
-                mainPlayer.setPath(path);
-                mainPlayer.targetResource = resource.id;
-            } else if (path === null) {
-                console.log('Cannot reach resource - no path available');
-            } else {
-                // Empty path means already at destination
-                mainPlayer.startGathering(resource.id);
-            }
+            // Request path from server
+            console.log('Requesting path to resource from server...');
+            socket.emit('requestPath', {
+                startX: playerPos.x,
+                startY: playerPos.y,
+                endX: closestTile.x,
+                endY: closestTile.y,
+                targetResourceId: resource.id
+            });
         } else {
-            console.log('Resource is completely surrounded by obstacles');
+            console.log('No adjacent tiles available for resource');
         }
     }
 }
@@ -350,10 +379,8 @@ function handleResourceClick(resource) {
 function removeResource(resourceId) {
     if (resources[resourceId]) {
         const resource = resources[resourceId];
-        const gridPos = resource.getGridPosition(TILE_SIZE);
 
-        // Remove obstacle from pathfinder
-        pathFinder.setObstacle(gridPos.x, gridPos.y, false);
+        // Note: Obstacles are now managed server-side
 
         resource.destroy();
         delete resources[resourceId];
