@@ -45,15 +45,7 @@ resourceManager.generateResources();
 
 // Mark multi-tile object positions as obstacles in pathfinder
 multiTileObjects.forEach(obj => {
-  if (obj.type === 'tree') {
-    // Mark bottom 2 rows of tree as obstacles (where player would collide)
-    obj.tiles.forEach(tile => {
-      const relativeY = tile.y - obj.y;
-      if (relativeY >= 3) { // Bottom 2 rows of the 5-row tree
-        pathFinder.setObstacle(tile.x, tile.y, true);
-      }
-    });
-  } else if (obj.type === 'house') {
+  if (obj.type === 'house') {
     // Mark walls and base of house as obstacles (rows 3-8, top 3 rows are roof/transparent)
     obj.tiles.forEach(tile => {
       const relativeY = tile.y - obj.y;
@@ -158,8 +150,8 @@ io.on('connection', (socket) => {
 
     // Check if inventory has space for the resource
     let requiredSlots = 0;
-    if (resource.type === 'tree') {
-      requiredSlots = 2; // Trees give 2 woods
+    if (resource.type === 'bush') {
+      requiredSlots = 2; // Bushes give 2 woods
     } else if (resource.type === 'rock') {
       requiredSlots = 1; // Rocks give 1 stone
     }

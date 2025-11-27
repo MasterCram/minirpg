@@ -357,12 +357,6 @@ function removePathDot(index) {
 function generateMap(scene, mapData) {
     gameMap = mapData;
 
-    // Tile indices from Grassland.png tileset (16x16 grid, 128x128 per tile)
-    const TILE_GRASS = 17;        // Main grass tile
-    const TILE_GRASS_VAR = 19;    // Grass variant (less common)
-    const TILE_DIRT = 50;         // Dirt tile
-    const TILE_SAND = CONFIG.TILES.SAND; // Grass with sand
-
     // Debug: Check if tileset is loaded
     if (!scene.textures.exists('tileset')) {
         console.error('Tileset not loaded! Check that Grassland.png is in client/assets/');
@@ -372,22 +366,9 @@ function generateMap(scene, mapData) {
 
     for (let y = 0; y < CONFIG.WORLD_HEIGHT; y++) {
         for (let x = 0; x < CONFIG.WORLD_WIDTH; x++) {
-            const tile = gameMap[y][x];
+            const tileIndex = gameMap[y][x];
             const posX = x * CONFIG.TILE_SIZE;
             const posY = y * CONFIG.TILE_SIZE;
-
-            let tileIndex;
-            if (tile === 'grass') {
-                tileIndex = TILE_GRASS;
-            } else if (tile === 'grass_var') {
-                tileIndex = TILE_GRASS_VAR;
-            } else if (tile === 'dirt') {
-                tileIndex = TILE_DIRT;
-            } else if (tile === 'grass_with_sand') {
-                tileIndex = TILE_SAND;
-            } else {
-                tileIndex = TILE_GRASS; // Default to grass
-            }
 
             // Create sprite from tileset and scale from 128x128 to 32x32
             const tileSprite = scene.add.sprite(posX, posY, 'tileset', tileIndex);

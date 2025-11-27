@@ -56,10 +56,10 @@ class ResourceManager {
                    this.isInSpawnZone(gridX, gridY);
         };
 
-        // Generate trees
-        let treesGenerated = 0;
+        // Generate bushes
+        let bushesGenerated = 0;
         let attempts = 0;
-        while (treesGenerated < CONFIG.TREE_COUNT && attempts < CONFIG.TREE_COUNT * 3) {
+        while (bushesGenerated < CONFIG.BUSH_COUNT && attempts < CONFIG.BUSH_COUNT * 3) {
             const gridX = Math.floor(Math.random() * CONFIG.WORLD_WIDTH);
             const gridY = Math.floor(Math.random() * CONFIG.WORLD_HEIGHT);
 
@@ -69,7 +69,7 @@ class ResourceManager {
 
                 const resource = {
                     id: this.resourceIdCounter++,
-                    type: 'tree',
+                    type: 'bush',
                     x: x,
                     y: y
                 };
@@ -77,7 +77,7 @@ class ResourceManager {
                 this.resources.push(resource);
                 occupiedTiles.add(`${gridX},${gridY}`);
                 this.pathFinder.setObstacle(gridX, gridY, true);
-                treesGenerated++;
+                bushesGenerated++;
             }
             attempts++;
         }
@@ -108,7 +108,7 @@ class ResourceManager {
             attempts++;
         }
 
-        console.log(`Generated ${treesGenerated} trees and ${rocksGenerated} rocks`);
+        console.log(`Generated ${bushesGenerated} bushes and ${rocksGenerated} rocks`);
     }
 
     getResources() {

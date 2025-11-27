@@ -90,8 +90,8 @@ class GameLoop {
         if (resource) {
             // Determine items to add
             let itemsToAdd = [];
-            if (resource.type === 'tree') {
-                itemsToAdd = ['wood', 'wood']; // Trees give 2 woods
+            if (resource.type === 'bush') {
+                itemsToAdd = ['wood', 'wood']; // Bushes give 2 woods
             } else if (resource.type === 'rock') {
                 itemsToAdd = ['stone']; // Rocks give 1 stone
             }
