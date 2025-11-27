@@ -53,6 +53,11 @@ multiTileObjects.forEach(obj => {
         pathFinder.setObstacle(tile.x, tile.y, true);
       }
     });
+  } else if (obj.type === 'well') {
+    // Mark all well tiles as obstacles (can't walk through well)
+    obj.tiles.forEach(tile => {
+      pathFinder.setObstacle(tile.x, tile.y, true);
+    });
   }
 });
 

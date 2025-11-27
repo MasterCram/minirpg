@@ -25,6 +25,12 @@ class MapGenerator {
         // Place house on top left
         this.placeHouse();
 
+        // Place house at middle right
+        this.placeHouse(CONFIG.WORLD_WIDTH - 7 - 1, Math.floor(CONFIG.WORLD_HEIGHT / 2) - 4);
+
+        // Place house at bottom left
+        this.placeHouse(1, CONFIG.WORLD_HEIGHT - 9 - 1);
+
         // Place well on top right
         this.placeWell();
 
@@ -42,14 +48,14 @@ class MapGenerator {
         return this.multiTileObjects;
     }
 
-    placeHouse() {
+    placeHouse(customX = null, customY = null) {
         const houseTemplate = CONFIG.MULTI_TILE_OBJECTS.HOUSE;
         const houseHeight = houseTemplate.length;
         const houseWidth = houseTemplate[0].length;
 
-        // Place house at top-left (with small margin)
-        const startX = 1;
-        const startY = 1;
+        // Use custom position or default to top-left
+        const startX = customX !== null ? customX : 1;
+        const startY = customY !== null ? customY : 1;
 
         // Check if house fits in map bounds
         if (startX + houseWidth > CONFIG.WORLD_WIDTH || startY + houseHeight > CONFIG.WORLD_HEIGHT) {
@@ -84,7 +90,7 @@ class MapGenerator {
         }
 
         this.multiTileObjects.push(multiTileHouse);
-        console.log('Placed house at top-left of village');
+        console.log(`Placed house at (${startX}, ${startY})`);
     }
 
     placeWell() {
@@ -92,9 +98,9 @@ class MapGenerator {
         const wellHeight = wellTemplate.length;
         const wellWidth = wellTemplate[0].length;
 
-        // Place well at top-right
-        const startX = CONFIG.WORLD_WIDTH - wellWidth - 1;
-        const startY = 1;
+        // Place well at top-right, then move 3 left, 2 down
+        const startX = CONFIG.WORLD_WIDTH - wellWidth - 1 - 3;
+        const startY = 1 + 2;
 
         const multiTileWell = {
             type: 'well',
