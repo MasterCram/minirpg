@@ -24,8 +24,8 @@ class EquipmentUI {
         uiContainer.id = 'equipment';
         uiContainer.style.cssText = `
             position: fixed;
-            top: 20px;
-            right: 20px;
+            bottom: 20px;
+            right: 368px;
             background: rgba(0, 0, 0, 0.9);
             color: white;
             padding: 15px;
