@@ -35,6 +35,9 @@ let resources = {};
 let droppedItems = {};
 let inventoryUI;
 let equipmentUI;
+let healthUI;
+let skillsUI;
+let multiTileObjects = [];
 let gameMap = [];
 let pathDots = []; // Visual path indicators
 let transparentObjects = []; // Track object sprites for transparency management (trees, houses, etc.)
@@ -79,6 +82,10 @@ function create() {
 
     equipmentUI = new EquipmentUI();
 
+    healthUI = new HealthUI();
+
+    skillsUI = new SkillsUI();
+
     // Setup socket connection
     setupSocketConnection(this);
 
@@ -120,6 +127,12 @@ function setupSocketConnection(scene) {
                 }
                 if (players[id].equipment) {
                     equipmentUI.update(players[id].equipment);
+                }
+                if (players[id].health !== undefined && players[id].maxHealth !== undefined) {
+                    healthUI.update(players[id].health, players[id].maxHealth);
+                }
+                if (players[id].skills) {
+                    skillsUI.update(players[id].skills);
                 }
 
                 // Center camera on player with smooth following
@@ -186,6 +199,22 @@ function setupSocketConnection(scene) {
     });
 
     socket.on('inventoryFull', (data) => {
+        showTemporaryMessage(data.message);
+    });
+
+    socket.on('healthUpdate', (data) => {
+        if (healthUI) {
+            healthUI.update(data.health, data.maxHealth);
+        }
+    });
+
+    socket.on('skillsUpdate', (newSkills) => {
+        if (skillsUI) {
+            skillsUI.update(newSkills);
+        }
+    });
+
+    socket.on('wellCooldown', (data) => {
         showTemporaryMessage(data.message);
     });
 
@@ -390,8 +419,11 @@ function generateMap(scene, mapData) {
     }
 }
 
-function renderMultiTileObjects(scene, multiTileObjects) {
+function renderMultiTileObjects(scene, receivedObjects) {
     console.log('Rendering multi-tile objects...');
+
+    // Store objects globally
+    multiTileObjects = receivedObjects;
 
     // Clear previous transparent objects
     transparentObjects = [];
@@ -429,6 +461,15 @@ function renderMultiTileObjects(scene, multiTileObjects) {
             const tileSprite = scene.add.sprite(posX, posY, tileset, tile.tileIndex);
             tileSprite.setOrigin(0, 0);
             tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+
+            // Make wells interactive
+            if (obj.type === 'well') {
+                tileSprite.setInteractive();
+                tileSprite.on('pointerdown', (pointer) => {
+                    pointer.event.stopPropagation();
+                    handleWellClick();
+                });
+            }
 
             // Determine if this tile is in a transparent row
             const isTransparentRow = transparentRows.includes(tile.row);
@@ -632,6 +673,13 @@ function updatePlayerCount() {
     if (playerCountElement) {
         playerCountElement.textContent = `Players online: ${count}`;
     }
+}
+
+function handleWellClick() {
+    if (!mainPlayer || !socket) return;
+
+    console.log('Well clicked');
+    socket.emit('useWell');
 }
 
 function showTemporaryMessage(message) {

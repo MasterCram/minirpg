@@ -25,6 +25,12 @@ class MapGenerator {
         // Place house on top left
         this.placeHouse();
 
+        // Place well on top right
+        this.placeWell();
+
+        // Place portal at middle top
+        this.placePortal();
+
         console.log('Village map generated successfully!');
     }
 
@@ -79,6 +85,80 @@ class MapGenerator {
 
         this.multiTileObjects.push(multiTileHouse);
         console.log('Placed house at top-left of village');
+    }
+
+    placeWell() {
+        const wellTemplate = CONFIG.MULTI_TILE_OBJECTS.WELL;
+        const wellHeight = wellTemplate.length;
+        const wellWidth = wellTemplate[0].length;
+
+        // Place well at top-right
+        const startX = CONFIG.WORLD_WIDTH - wellWidth - 1;
+        const startY = 1;
+
+        const multiTileWell = {
+            type: 'well',
+            tileset: 'town',
+            x: startX,
+            y: startY,
+            width: wellWidth,
+            height: wellHeight,
+            tiles: []
+        };
+
+        for (let dy = 0; dy < wellHeight; dy++) {
+            for (let dx = 0; dx < wellWidth; dx++) {
+                const tileIndex = wellTemplate[dy][dx];
+                if (tileIndex !== -1) {
+                    multiTileWell.tiles.push({
+                        x: startX + dx,
+                        y: startY + dy,
+                        tileIndex: tileIndex,
+                        row: dy
+                    });
+                }
+            }
+        }
+
+        this.multiTileObjects.push(multiTileWell);
+        console.log('Placed well at top-right of village');
+    }
+
+    placePortal() {
+        const portalTemplate = CONFIG.MULTI_TILE_OBJECTS.PORTAL;
+        const portalHeight = portalTemplate.length;
+        const portalWidth = portalTemplate[0].length;
+
+        // Place portal at middle top
+        const startX = Math.floor((CONFIG.WORLD_WIDTH - portalWidth) / 2);
+        const startY = 0;
+
+        const multiTilePortal = {
+            type: 'portal',
+            tileset: 'town',
+            x: startX,
+            y: startY,
+            width: portalWidth,
+            height: portalHeight,
+            tiles: []
+        };
+
+        for (let dy = 0; dy < portalHeight; dy++) {
+            for (let dx = 0; dx < portalWidth; dx++) {
+                const tileIndex = portalTemplate[dy][dx];
+                if (tileIndex !== -1) {
+                    multiTilePortal.tiles.push({
+                        x: startX + dx,
+                        y: startY + dy,
+                        tileIndex: tileIndex,
+                        row: dy
+                    });
+                }
+            }
+        }
+
+        this.multiTileObjects.push(multiTilePortal);
+        console.log('Placed portal at middle top of village');
     }
 }
 

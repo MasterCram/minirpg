@@ -56,6 +56,15 @@
         [96, 97, 98, 99, 100, 101, 102],
         [-1, 113, 114, 11, 116, 117, -1],
         [-1, 129, 130, 27, 132, 133, -1]
+      ],
+      WELL: [
+        [104, 105],
+        [120, 121],
+        [136, 137]
+      ],
+      PORTAL: [
+        [138, 139],
+        [154, 155]
       ]
     },
 
@@ -66,6 +75,12 @@
       },
       HOUSE: {
         transparentRows: [0, 1, 2]  // Top 3 rows (roof and upper walls)
+      },
+      WELL: {
+        transparentRows: []  // No transparency for well
+      },
+      PORTAL: {
+        transparentRows: []  // No transparency for portal
       }
     },
 

@@ -22,6 +22,8 @@ class PlayerManager {
             x: spawnX,
             y: spawnY,
             username: `Player${Math.floor(Math.random() * 1000)}`,
+            health: 10,
+            maxHealth: 10,
             inventory: Array(CONFIG.INVENTORY_SLOTS).fill(null),
             equipment: {
                 cape: null,
@@ -37,6 +39,14 @@ class PlayerManager {
                 boots: null,
                 belt: null
             },
+            skills: {
+                combat: 1,
+                mining: 1,
+                smithing: 1,
+                crafting: 1,
+                foraging: 1,
+                slayer: 1
+            },
             // Server-side movement state
             path: [],
             pathIndex: 0,
@@ -48,7 +58,9 @@ class PlayerManager {
             gatheringResourceId: null,
             gatheringItemId: null,
             gatheringDuration: CONFIG.GATHERING_DURATION,
-            itemPickupDuration: CONFIG.ITEM_PICKUP_DURATION
+            itemPickupDuration: CONFIG.ITEM_PICKUP_DURATION,
+            // Well cooldown
+            lastWellUse: 0
         };
 
         return this.players[socketId];
@@ -179,6 +191,21 @@ class PlayerManager {
         player.gatheringItemId = null;
 
         this.io.emit('playerFinishedGathering', { playerId: socketId });
+    }
+
+    healPlayer(socketId) {
+        const player = this.players[socketId];
+        if (!player) return false;
+
+        const now = Date.now();
+        if (now - player.lastWellUse < 3000) {
+            return false; // Still on cooldown
+        }
+
+        player.health = player.maxHealth;
+        player.lastWellUse = now;
+        this.io.to(socketId).emit('healthUpdate', { health: player.health, maxHealth: player.maxHealth });
+        return true;
     }
 }
 

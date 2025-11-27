@@ -227,6 +227,16 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle well usage
+  socket.on('useWell', () => {
+    const success = playerManager.healPlayer(socket.id);
+    if (!success) {
+      socket.emit('wellCooldown', { message: 'Well is on cooldown (3 seconds)' });
+    } else {
+      console.log(`${socket.id} used the well and healed to full health`);
+    }
+  });
+
   // Handle disconnect
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
