@@ -30,6 +30,17 @@
       SAND: 18
     },
 
+    // Multi-tile object templates
+    MULTI_TILE_OBJECTS: {
+      TREE: [
+        [176, 177, 178, 179, 180],
+        [192, 193, 194, 195, 196],
+        [208, 209, 210, 211, 212],
+        [-1, 225, 226, 227, -1],
+        [-1, 241, 242, 243, -1]
+      ]
+    },
+
     // Map generation probabilities
     MAP_GEN: {
       GRASS_CHANCE: 0.80,      // 80% grass

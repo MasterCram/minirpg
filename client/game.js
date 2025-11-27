@@ -93,6 +93,11 @@ function setupSocketConnection(scene) {
         generateMap(scene, mapData);
     });
 
+    socket.on('multiTileObjectsData', (multiTileObjects) => {
+        console.log('Received multi-tile objects:', multiTileObjects.length, 'objects');
+        renderMultiTileObjects(scene, multiTileObjects);
+    });
+
     socket.on('currentPlayers', (players) => {
         console.log('Received currentPlayers:', Object.keys(players).length, 'players');
         Object.keys(players).forEach((id) => {
@@ -112,6 +117,7 @@ function setupSocketConnection(scene) {
                 scene.cameras.main.centerOn(mainPlayer.sprite.x, mainPlayer.sprite.y);
 
                 socket.emit('requestMap');
+                socket.emit('requestMultiTileObjects');
                 socket.emit('requestResources');
                 socket.emit('requestDroppedItems');
             } else {
@@ -378,6 +384,40 @@ function generateMap(scene, mapData) {
     for (let y = 0; y <= CONFIG.WORLD_HEIGHT; y++) {
         gridGraphics.lineBetween(0, y * CONFIG.TILE_SIZE, CONFIG.WORLD_WIDTH * CONFIG.TILE_SIZE, y * CONFIG.TILE_SIZE);
     }
+}
+
+function renderMultiTileObjects(scene, multiTileObjects) {
+    if (!scene.textures.exists('tileset')) {
+        console.error('Tileset not loaded!');
+        return;
+    }
+
+    console.log('Rendering multi-tile objects...');
+
+    multiTileObjects.forEach(obj => {
+        // Render each tile of the object
+        obj.tiles.forEach(tile => {
+            const posX = tile.x * CONFIG.TILE_SIZE;
+            const posY = tile.y * CONFIG.TILE_SIZE;
+
+            const tileSprite = scene.add.sprite(posX, posY, 'tileset', tile.tileIndex);
+            tileSprite.setOrigin(0, 0);
+            tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
+
+            // Trees should render above grass but below players
+            // Depth: grass=0, grid=1, trees=2-4, resources=5, players=10
+            const relativeY = tile.y - obj.y;
+            if (relativeY < 3) {
+                // Top part of tree (canopy) - behind player
+                tileSprite.setDepth(2);
+            } else {
+                // Bottom part of tree (trunk) - in front of player top, behind player bottom
+                tileSprite.setDepth(11); // Above player
+            }
+        });
+    });
+
+    console.log(`Rendered ${multiTileObjects.length} multi-tile objects`);
 }
 
 function createResource(scene, resourceData) {

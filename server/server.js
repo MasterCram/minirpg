@@ -37,6 +37,20 @@ const gameLoop = new GameLoop(io, playerManager, resourceManager, droppedItemMan
 mapGenerator.generateMap();
 resourceManager.generateResources();
 
+// Mark multi-tile tree positions as obstacles in pathfinder
+const multiTileObjects = mapGenerator.getMultiTileObjects();
+multiTileObjects.forEach(obj => {
+  if (obj.type === 'tree') {
+    // Mark bottom 2 rows of tree as obstacles (where player would collide)
+    obj.tiles.forEach(tile => {
+      const relativeY = tile.y - obj.y;
+      if (relativeY >= 3) { // Bottom 2 rows of the 5-row tree
+        pathFinder.setObstacle(tile.x, tile.y, true);
+      }
+    });
+  }
+});
+
 // Start game loop
 gameLoop.start();
 
@@ -54,6 +68,11 @@ io.on('connection', (socket) => {
   // Handle map request
   socket.on('requestMap', () => {
     socket.emit('mapData', mapGenerator.getMap());
+  });
+
+  // Handle multi-tile objects request
+  socket.on('requestMultiTileObjects', () => {
+    socket.emit('multiTileObjectsData', mapGenerator.getMultiTileObjects());
   });
 
   // Handle resources request
