@@ -1,6 +1,7 @@
 class EquipmentUI {
     constructor() {
         this.equipment = {
+            cape: null,
             helmet: null,
             amulet: null,
             ring1: null,
@@ -45,22 +46,38 @@ class EquipmentUI {
             gap: 6px;
         `;
 
-        // Equipment slot configuration
-        const slotConfig = [
+        // Equipment slot layout matrix:
+        // [cape, helmet, amulet]
+        // [main, chest, offhand]
+        // [ring1, legs, ring2]
+        // [none, boots, none]
+        const slotLayout = [
+            { key: 'cape', label: 'Cape', icon: '🦸' },
             { key: 'helmet', label: 'Helmet', icon: '⛑️' },
             { key: 'amulet', label: 'Amulet', icon: '📿' },
-            { key: 'chestplate', label: 'Chest', icon: '🛡️' },
-            { key: 'gloves', label: 'Gloves', icon: '🧤' },
-            { key: 'ring1', label: 'Ring 1', icon: '💍' },
-            { key: 'ring2', label: 'Ring 2', icon: '💍' },
-            { key: 'leggings', label: 'Legs', icon: '👖' },
-            { key: 'boots', label: 'Boots', icon: '👢' },
-            { key: 'belt', label: 'Belt', icon: '🔗' },
             { key: 'mainHand', label: 'Main', icon: '⚔️' },
-            { key: 'offHand', label: 'Off', icon: '🛡️' }
+            { key: 'chestplate', label: 'Chest', icon: '🛡️' },
+            { key: 'offHand', label: 'Off', icon: '🛡️' },
+            { key: 'ring1', label: 'Ring 1', icon: '💍' },
+            { key: 'leggings', label: 'Legs', icon: '👖' },
+            { key: 'ring2', label: 'Ring 2', icon: '💍' },
+            null, // Empty slot
+            { key: 'boots', label: 'Boots', icon: '👢' },
+            null  // Empty slot
         ];
 
-        slotConfig.forEach(config => {
+        slotLayout.forEach(config => {
+            if (config === null) {
+                // Create empty placeholder
+                const emptySlot = document.createElement('div');
+                emptySlot.style.cssText = `
+                    width: 50px;
+                    height: 50px;
+                `;
+                slotsContainer.appendChild(emptySlot);
+                return;
+            }
+
             const slot = document.createElement('div');
             slot.className = 'equipment-slot';
             slot.dataset.slotKey = config.key;

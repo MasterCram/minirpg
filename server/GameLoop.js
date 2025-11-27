@@ -96,6 +96,15 @@ class GameLoop {
                 itemsToAdd = ['stone']; // Rocks give 1 stone
             }
 
+            // Check if inventory has enough space
+            const emptySlots = player.inventory.filter(slot => slot === null).length;
+            if (emptySlots < itemsToAdd.length) {
+                console.log(`${playerId} inventory full - cannot gather`);
+                this.io.to(playerId).emit('inventoryFull', { message: 'Inventory is full!' });
+                this.playerManager.stopGathering(playerId);
+                return;
+            }
+
             // Add items to inventory
             this.playerManager.addMultipleItemsToInventory(playerId, itemsToAdd);
 

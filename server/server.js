@@ -156,6 +156,21 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Check if inventory has space for the resource
+    let requiredSlots = 0;
+    if (resource.type === 'tree') {
+      requiredSlots = 2; // Trees give 2 woods
+    } else if (resource.type === 'rock') {
+      requiredSlots = 1; // Rocks give 1 stone
+    }
+
+    const emptySlots = player.inventory.filter(slot => slot === null).length;
+    if (emptySlots < requiredSlots) {
+      console.log(`${socket.id} inventory full - cannot start gathering`);
+      socket.emit('inventoryFull', { message: 'Inventory is full!' });
+      return;
+    }
+
     // Start gathering
     playerManager.startGathering(socket.id, resourceId, CONFIG.GATHERING_DURATION);
     console.log(`${socket.id} started gathering resource ${resourceId}`);

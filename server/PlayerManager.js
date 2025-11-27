@@ -24,6 +24,7 @@ class PlayerManager {
             username: `Player${Math.floor(Math.random() * 1000)}`,
             inventory: Array(CONFIG.INVENTORY_SLOTS).fill(null),
             equipment: {
+                cape: null,
                 helmet: null,
                 amulet: null,
                 ring1: null,

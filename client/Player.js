@@ -33,7 +33,8 @@ class Player {
 
         this.sprite = this.scene.physics.add.sprite(snapX, snapY, 'player-' + this.id);
         this.sprite.setCollideWorldBounds(true);
-        this.sprite.setDepth(10);
+        // Player depth: 100 + Y position for proper Y-sorting above object bottoms
+        this.sprite.setDepth(100 + gridY);
 
         this.nameText = this.scene.add.text(snapX, snapY - 25, this.username, {
             fontSize: '11px',
@@ -42,7 +43,8 @@ class Player {
             padding: { x: 3, y: 2 }
         });
         this.nameText.setOrigin(0.5);
-        this.nameText.setDepth(11);
+        // Name text slightly above player
+        this.nameText.setDepth(101 + gridY);
     }
 
     setPath(path) {
@@ -170,6 +172,11 @@ class Player {
 
                 this.sprite.x += moveX;
                 this.sprite.y += moveY;
+
+                // Update depth based on Y position for proper rendering order
+                const currentGridY = Math.floor(this.sprite.y / TILE_SIZE);
+                this.sprite.setDepth(100 + currentGridY);
+                this.nameText.setDepth(101 + currentGridY);
             }
         }
 
@@ -187,6 +194,11 @@ class Player {
     updatePosition(x, y) {
         // Directly set position for other players to ensure they update even when tab is inactive
         this.sprite.setPosition(x, y);
+
+        // Update depth based on Y position for proper rendering order
+        const gridY = Math.floor(y / CONFIG.TILE_SIZE);
+        this.sprite.setDepth(100 + gridY);
+        this.nameText.setDepth(101 + gridY);
     }
 
     updateInventory(inventory) {

@@ -185,6 +185,10 @@ function setupSocketConnection(scene) {
         }
     });
 
+    socket.on('inventoryFull', (data) => {
+        showTemporaryMessage(data.message);
+    });
+
     // Listen for path updates from server
     socket.on('playerPath', (data) => {
         const { playerId, path, targetResourceId } = data;
@@ -647,4 +651,30 @@ function updatePlayerCount() {
     if (playerCountElement) {
         playerCountElement.textContent = `Players online: ${count}`;
     }
+}
+
+function showTemporaryMessage(message) {
+    // Create message element
+    const messageElement = document.createElement('div');
+    messageElement.textContent = message;
+    messageElement.style.position = 'fixed';
+    messageElement.style.top = '50%';
+    messageElement.style.left = '50%';
+    messageElement.style.transform = 'translate(-50%, -50%)';
+    messageElement.style.backgroundColor = 'rgba(0, 0, 0, 0.9)';
+    messageElement.style.color = '#ff4444';
+    messageElement.style.padding = '20px 40px';
+    messageElement.style.borderRadius = '8px';
+    messageElement.style.fontSize = '18px';
+    messageElement.style.fontWeight = 'bold';
+    messageElement.style.zIndex = '10000';
+    messageElement.style.border = '2px solid #ff4444';
+    messageElement.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.5)';
+
+    document.body.appendChild(messageElement);
+
+    // Remove after 2 seconds
+    setTimeout(() => {
+        messageElement.remove();
+    }, 2000);
 }
