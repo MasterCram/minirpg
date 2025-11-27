@@ -6,6 +6,30 @@ class ResourceManager {
         this.io = io;
         this.resources = [];
         this.resourceIdCounter = 0;
+        this.multiTileObjects = [];
+    }
+
+    setMultiTileObjects(multiTileObjects) {
+        this.multiTileObjects = multiTileObjects;
+    }
+
+    isNearMultiTileTree(gridX, gridY) {
+        // Check if position is within or adjacent to any multi-tile tree
+        for (const obj of this.multiTileObjects) {
+            if (obj.type === 'tree') {
+                // Check if within tree bounds + 1 tile buffer
+                const minX = obj.x - 1;
+                const minY = obj.y - 1;
+                const maxX = obj.x + obj.width;
+                const maxY = obj.y + obj.height;
+
+                if (gridX >= minX && gridX <= maxX &&
+                    gridY >= minY && gridY <= maxY) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     generateResources() {
@@ -17,7 +41,7 @@ class ResourceManager {
 
         // Helper function to check if tile is occupied
         const isTileOccupied = (gridX, gridY) => {
-            return occupiedTiles.has(`${gridX},${gridY}`);
+            return occupiedTiles.has(`${gridX},${gridY}`) || this.isNearMultiTileTree(gridX, gridY);
         };
 
         // Generate trees
@@ -113,12 +137,12 @@ class ResourceManager {
                 const gridX = Math.floor(Math.random() * CONFIG.WORLD_WIDTH);
                 const gridY = Math.floor(Math.random() * CONFIG.WORLD_HEIGHT);
 
-                // Check if tile is already occupied
+                // Check if tile is already occupied or near multi-tile trees
                 const occupied = this.resources.some(r => {
                     const rGridX = Math.floor(r.x / CONFIG.TILE_SIZE);
                     const rGridY = Math.floor(r.y / CONFIG.TILE_SIZE);
                     return rGridX === gridX && rGridY === gridY;
-                });
+                }) || this.isNearMultiTileTree(gridX, gridY);
 
                 if (!occupied) {
                     const newResource = {

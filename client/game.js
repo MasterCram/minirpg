@@ -411,13 +411,13 @@ function renderMultiTileObjects(scene, multiTileObjects) {
             tileSprite.setOrigin(0, 0);
             tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
 
-            // Depth: grass=0, grid=1, resources=5, players=10, trees=11-12
+            // Depth: grass=0, grid=1, resources=5, players=10, tree_trunk=11, tree_canopy=12
             const relativeY = tile.y - obj.y;
             const isCanopy = relativeY < 3;
 
             if (isCanopy) {
-                // Top part of tree (canopy) - ABOVE player
-                tileSprite.setDepth(11);
+                // Top part of tree (canopy) - ABOVE everything
+                tileSprite.setDepth(12);
 
                 // Store this canopy tile
                 canopyTiles.push({
@@ -426,8 +426,8 @@ function renderMultiTileObjects(scene, multiTileObjects) {
                     gridY: tile.y
                 });
             } else {
-                // Bottom part of tree (trunk) - also above player
-                tileSprite.setDepth(12);
+                // Bottom part of tree (trunk/stump) - above player but below canopy
+                tileSprite.setDepth(11);
             }
         });
 

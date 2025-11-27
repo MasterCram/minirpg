@@ -35,10 +35,15 @@ const gameLoop = new GameLoop(io, playerManager, resourceManager, droppedItemMan
 
 // Generate initial world
 mapGenerator.generateMap();
+
+// Get multi-tile objects and pass to ResourceManager to avoid placing resources near trees
+const multiTileObjects = mapGenerator.getMultiTileObjects();
+resourceManager.setMultiTileObjects(multiTileObjects);
+
+// Generate resources (will avoid multi-tile trees)
 resourceManager.generateResources();
 
 // Mark multi-tile tree positions as obstacles in pathfinder
-const multiTileObjects = mapGenerator.getMultiTileObjects();
 multiTileObjects.forEach(obj => {
   if (obj.type === 'tree') {
     // Mark bottom 2 rows of tree as obstacles (where player would collide)
