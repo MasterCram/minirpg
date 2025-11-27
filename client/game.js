@@ -399,6 +399,9 @@ function renderMultiTileObjects(scene, multiTileObjects) {
     treeTiles = [];
 
     multiTileObjects.forEach(obj => {
+        // Create a group for this tree's canopy tiles
+        const canopyTiles = [];
+
         // Render each tile of the object
         obj.tiles.forEach(tile => {
             const posX = tile.x * CONFIG.TILE_SIZE;
@@ -408,27 +411,33 @@ function renderMultiTileObjects(scene, multiTileObjects) {
             tileSprite.setOrigin(0, 0);
             tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
 
-            // Trees should render above grass but below players
-            // Depth: grass=0, grid=1, trees=2-4, resources=5, players=10
+            // Depth: grass=0, grid=1, resources=5, players=10, trees=11-12
             const relativeY = tile.y - obj.y;
             const isCanopy = relativeY < 3;
 
             if (isCanopy) {
-                // Top part of tree (canopy) - behind player
-                tileSprite.setDepth(2);
+                // Top part of tree (canopy) - ABOVE player
+                tileSprite.setDepth(11);
 
-                // Store canopy tiles for transparency management
-                treeTiles.push({
+                // Store this canopy tile
+                canopyTiles.push({
                     sprite: tileSprite,
                     gridX: tile.x,
-                    gridY: tile.y,
-                    isCanopy: true
+                    gridY: tile.y
                 });
             } else {
-                // Bottom part of tree (trunk) - in front of player
-                tileSprite.setDepth(11); // Above player
+                // Bottom part of tree (trunk) - also above player
+                tileSprite.setDepth(12);
             }
         });
+
+        // Store canopy tiles with tree object reference
+        if (canopyTiles.length > 0) {
+            treeTiles.push({
+                treeObj: obj,
+                canopyTiles: canopyTiles
+            });
+        }
     });
 
     console.log(`Rendered ${multiTileObjects.length} multi-tile objects`);
@@ -570,24 +579,32 @@ function updateTreeTransparency() {
     // Get all player positions
     const allPlayers = [mainPlayer, ...Object.values(otherPlayers)];
 
-    // For each tree tile, check if any player is behind it
-    treeTiles.forEach(treeTile => {
-        let playerBehind = false;
+    // For each tree, check if any player is under it
+    treeTiles.forEach(treeGroup => {
+        let playerUnderTree = false;
 
+        const tree = treeGroup.treeObj;
+        const treeStartX = tree.x;
+        const treeStartY = tree.y;
+        const treeEndX = tree.x + tree.width;
+        const treeEndY = tree.y + tree.height;
+
+        // Check if any player is within this tree's bounds
         for (const player of allPlayers) {
             const playerGridPos = player.getGridPosition();
 
-            // Check if player is on same tile or adjacent to this tree tile
-            // Player is "behind" tree canopy if they're on the same tile or below it
-            if (playerGridPos.x === treeTile.gridX &&
-                playerGridPos.y >= treeTile.gridY) {
-                playerBehind = true;
+            // Player is under tree if they're within the tree's X and Y range
+            if (playerGridPos.x >= treeStartX && playerGridPos.x < treeEndX &&
+                playerGridPos.y >= treeStartY && playerGridPos.y < treeEndY) {
+                playerUnderTree = true;
                 break;
             }
         }
 
-        // Set transparency: 0.5 if player behind, 1.0 otherwise
-        treeTile.sprite.setAlpha(playerBehind ? 0.5 : 1.0);
+        // Set transparency for all canopy tiles of this tree
+        treeGroup.canopyTiles.forEach(tile => {
+            tile.sprite.setAlpha(playerUnderTree ? 0.5 : 1.0);
+        });
     });
 }
 
