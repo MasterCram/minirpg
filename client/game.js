@@ -36,6 +36,7 @@ let droppedItems = {};
 let inventoryUI;
 let gameMap = [];
 let pathDots = []; // Visual path indicators
+let treeTiles = []; // Track tree sprites for transparency management
 
 function preload() {
     // Load tileset - 16x16 grid, each tile is 128x128 pixels
@@ -394,6 +395,9 @@ function renderMultiTileObjects(scene, multiTileObjects) {
 
     console.log('Rendering multi-tile objects...');
 
+    // Clear previous tree tiles
+    treeTiles = [];
+
     multiTileObjects.forEach(obj => {
         // Render each tile of the object
         obj.tiles.forEach(tile => {
@@ -407,11 +411,21 @@ function renderMultiTileObjects(scene, multiTileObjects) {
             // Trees should render above grass but below players
             // Depth: grass=0, grid=1, trees=2-4, resources=5, players=10
             const relativeY = tile.y - obj.y;
-            if (relativeY < 3) {
+            const isCanopy = relativeY < 3;
+
+            if (isCanopy) {
                 // Top part of tree (canopy) - behind player
                 tileSprite.setDepth(2);
+
+                // Store canopy tiles for transparency management
+                treeTiles.push({
+                    sprite: tileSprite,
+                    gridX: tile.x,
+                    gridY: tile.y,
+                    isCanopy: true
+                });
             } else {
-                // Bottom part of tree (trunk) - in front of player top, behind player bottom
+                // Bottom part of tree (trunk) - in front of player
                 tileSprite.setDepth(11); // Above player
             }
         });
@@ -544,6 +558,36 @@ function update(time, delta) {
 
     Object.values(otherPlayers).forEach(player => {
         player.nameText.setPosition(player.sprite.x, player.sprite.y - 25);
+    });
+
+    // Update tree transparency based on player positions
+    updateTreeTransparency();
+}
+
+function updateTreeTransparency() {
+    if (!mainPlayer) return;
+
+    // Get all player positions
+    const allPlayers = [mainPlayer, ...Object.values(otherPlayers)];
+
+    // For each tree tile, check if any player is behind it
+    treeTiles.forEach(treeTile => {
+        let playerBehind = false;
+
+        for (const player of allPlayers) {
+            const playerGridPos = player.getGridPosition();
+
+            // Check if player is on same tile or adjacent to this tree tile
+            // Player is "behind" tree canopy if they're on the same tile or below it
+            if (playerGridPos.x === treeTile.gridX &&
+                playerGridPos.y >= treeTile.gridY) {
+                playerBehind = true;
+                break;
+            }
+        }
+
+        // Set transparency: 0.5 if player behind, 1.0 otherwise
+        treeTile.sprite.setAlpha(playerBehind ? 0.5 : 1.0);
     });
 }
 
