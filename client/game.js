@@ -358,11 +358,11 @@ function generateMap(scene, mapData) {
     gameMap = mapData;
 
     // Debug: Check if tileset is loaded
-    if (!scene.textures.exists('tileset')) {
-        console.error('Tileset not loaded! Check that Grassland.png is in client/assets/');
+    if (!scene.textures.exists('town')) {
+        console.error('Town tileset not loaded! Check that Town.png is in client/assets/');
         return;
     }
-    console.log('Tileset loaded successfully. Generating map...');
+    console.log('Town tileset loaded successfully. Generating map...');
 
     for (let y = 0; y < CONFIG.WORLD_HEIGHT; y++) {
         for (let x = 0; x < CONFIG.WORLD_WIDTH; x++) {
@@ -370,8 +370,8 @@ function generateMap(scene, mapData) {
             const posX = x * CONFIG.TILE_SIZE;
             const posY = y * CONFIG.TILE_SIZE;
 
-            // Create sprite from tileset and scale from 128x128 to 32x32
-            const tileSprite = scene.add.sprite(posX, posY, 'tileset', tileIndex);
+            // Create sprite from Town.png tileset and scale from 128x128 to 32x32
+            const tileSprite = scene.add.sprite(posX, posY, 'town', tileIndex);
             tileSprite.setOrigin(0, 0);
             tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
             tileSprite.setDepth(0);
