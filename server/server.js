@@ -43,13 +43,21 @@ resourceManager.setMultiTileObjects(multiTileObjects);
 // Generate resources (will avoid multi-tile trees)
 resourceManager.generateResources();
 
-// Mark multi-tile tree positions as obstacles in pathfinder
+// Mark multi-tile object positions as obstacles in pathfinder
 multiTileObjects.forEach(obj => {
   if (obj.type === 'tree') {
     // Mark bottom 2 rows of tree as obstacles (where player would collide)
     obj.tiles.forEach(tile => {
       const relativeY = tile.y - obj.y;
       if (relativeY >= 3) { // Bottom 2 rows of the 5-row tree
+        pathFinder.setObstacle(tile.x, tile.y, true);
+      }
+    });
+  } else if (obj.type === 'house') {
+    // Mark walls and base of house as obstacles (rows 3-8, top 3 rows are roof/transparent)
+    obj.tiles.forEach(tile => {
+      const relativeY = tile.y - obj.y;
+      if (relativeY >= 3) { // Bottom 6 rows of the 9-row house
         pathFinder.setObstacle(tile.x, tile.y, true);
       }
     });

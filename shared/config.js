@@ -45,7 +45,28 @@
         [208, 209, 210, 211, 212],
         [-1, 225, 226, 227, -1],
         [-1, 241, 242, 243, -1]
+      ],
+      HOUSE: [
+        [-1, -1, 2, 3, 4, -1, -1],
+        [-1, 17, 18, 51, 20, 21, -1],
+        [32, 33, 34, 35, 36, 37, 38],
+        [48, 49, 50, 51, 52, 53, 54],
+        [48, 49, 66, 67, 68, 53, 54],
+        [48, 81, 82, 83, 84, 85, 54],
+        [96, 97, 98, 99, 100, 101, 102],
+        [-1, 113, 114, 11, 116, 117, -1],
+        [-1, 129, 130, 27, 132, 133, -1]
       ]
+    },
+
+    // Object transparency settings (which rows should become transparent)
+    OBJECT_TRANSPARENCY: {
+      TREE: {
+        transparentRows: [0, 1, 2]  // Top 3 rows (canopy)
+      },
+      HOUSE: {
+        transparentRows: [0, 1, 2]  // Top 3 rows (roof and upper walls)
+      }
     },
 
     // Map generation probabilities
