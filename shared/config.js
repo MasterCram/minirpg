@@ -10,8 +10,8 @@
     MOVE_SPEED: 150, // Pixels per second
 
     // Resource generation
-    BUSH_COUNT: 20,   // Bushes (harvestable for wood)
-    ROCK_COUNT: 10,   // Rocks (harvestable for stone)
+    BUSH_COUNT: 0,   // Bushes disabled in village
+    ROCK_COUNT: 0,   // Rocks disabled in village
 
     // Spawn zone (center 5x5 area)
     SPAWN_ZONE: {
