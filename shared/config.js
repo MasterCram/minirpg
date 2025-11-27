@@ -10,8 +10,15 @@
     MOVE_SPEED: 150, // Pixels per second
 
     // Resource generation
-    TREE_COUNT: 50,   // Reduced from 150
-    ROCK_COUNT: 30,   // Reduced from 100
+    TREE_COUNT: 20,   // Further reduced
+    ROCK_COUNT: 10,   // Further reduced
+
+    // Spawn zone (center 5x5 area)
+    SPAWN_ZONE: {
+      CENTER_X: 12,  // Center of 25x25 map
+      CENTER_Y: 12,
+      RADIUS: 2      // 2 tiles from center = 5x5 area (10-14)
+    },
 
     // Resource respawn
     RESOURCE_RESPAWN_TIME: 5000, // 5 seconds

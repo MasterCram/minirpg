@@ -7,8 +7,15 @@ class PlayerManager {
     }
 
     createPlayer(socketId) {
-        const spawnX = Math.floor(Math.random() * CONFIG.WORLD_WIDTH) * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-        const spawnY = Math.floor(Math.random() * CONFIG.WORLD_HEIGHT) * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        // Spawn in the safe zone (middle 5x5)
+        const minSpawnGrid = CONFIG.SPAWN_ZONE.CENTER_X - CONFIG.SPAWN_ZONE.RADIUS;
+        const maxSpawnGrid = CONFIG.SPAWN_ZONE.CENTER_X + CONFIG.SPAWN_ZONE.RADIUS;
+
+        const spawnGridX = minSpawnGrid + Math.floor(Math.random() * (maxSpawnGrid - minSpawnGrid + 1));
+        const spawnGridY = minSpawnGrid + Math.floor(Math.random() * (maxSpawnGrid - minSpawnGrid + 1));
+
+        const spawnX = spawnGridX * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+        const spawnY = spawnGridY * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
 
         this.players[socketId] = {
             id: socketId,
@@ -16,6 +23,19 @@ class PlayerManager {
             y: spawnY,
             username: `Player${Math.floor(Math.random() * 1000)}`,
             inventory: Array(CONFIG.INVENTORY_SLOTS).fill(null),
+            equipment: {
+                helmet: null,
+                amulet: null,
+                ring1: null,
+                ring2: null,
+                gloves: null,
+                chestplate: null,
+                leggings: null,
+                mainHand: null,
+                offHand: null,
+                boots: null,
+                belt: null
+            },
             // Server-side movement state
             path: [],
             pathIndex: 0,

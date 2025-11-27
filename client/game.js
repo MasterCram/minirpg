@@ -34,6 +34,7 @@ let otherPlayers = {};
 let resources = {};
 let droppedItems = {};
 let inventoryUI;
+let equipmentUI;
 let gameMap = [];
 let pathDots = []; // Visual path indicators
 let treeTiles = []; // Track tree sprites for transparency management
@@ -69,6 +70,8 @@ function create() {
             socket.emit('swapItems', { fromSlot, toSlot });
         }
     });
+
+    equipmentUI = new EquipmentUI();
 
     // Setup socket connection
     setupSocketConnection(this);
@@ -108,6 +111,9 @@ function setupSocketConnection(scene) {
                 console.log('Main player created successfully!', mainPlayer);
                 if (players[id].inventory) {
                     inventoryUI.update(players[id].inventory);
+                }
+                if (players[id].equipment) {
+                    equipmentUI.update(players[id].equipment);
                 }
 
                 // Center camera on player with smooth following
@@ -165,6 +171,12 @@ function setupSocketConnection(scene) {
             mainPlayer.updateInventory(newInventory);
         }
         inventoryUI.update(newInventory);
+    });
+
+    socket.on('equipmentUpdate', (newEquipment) => {
+        if (equipmentUI) {
+            equipmentUI.update(newEquipment);
+        }
     });
 
     // Listen for path updates from server
@@ -402,6 +414,14 @@ function renderMultiTileObjects(scene, multiTileObjects) {
         // Create a group for this tree's canopy tiles
         const canopyTiles = [];
 
+        // Calculate depth based on tree's bottom Y position
+        // Trees further down (higher Y) render on top
+        // Base depth for trunks: 100, canopy: 200
+        // Add tree's max Y to make lower trees render on top
+        const treeBottomY = obj.y + obj.height - 1;
+        const trunkDepth = 100 + treeBottomY;
+        const canopyDepth = 200 + treeBottomY;
+
         // Render each tile of the object
         obj.tiles.forEach(tile => {
             const posX = tile.x * CONFIG.TILE_SIZE;
@@ -411,13 +431,13 @@ function renderMultiTileObjects(scene, multiTileObjects) {
             tileSprite.setOrigin(0, 0);
             tileSprite.setDisplaySize(CONFIG.TILE_SIZE, CONFIG.TILE_SIZE);
 
-            // Depth: grass=0, grid=1, resources=5, players=10, tree_trunk=11, tree_canopy=12
+            // Depth: grass=0, grid=1, resources=5, players=10, tree_trunk=100+Y, tree_canopy=200+Y
             const relativeY = tile.y - obj.y;
             const isCanopy = relativeY < 3;
 
             if (isCanopy) {
-                // Top part of tree (canopy) - ABOVE everything
-                tileSprite.setDepth(12);
+                // Top part of tree (canopy) - depth based on tree position
+                tileSprite.setDepth(canopyDepth);
 
                 // Store this canopy tile
                 canopyTiles.push({
@@ -426,8 +446,8 @@ function renderMultiTileObjects(scene, multiTileObjects) {
                     gridY: tile.y
                 });
             } else {
-                // Bottom part of tree (trunk/stump) - above player but below canopy
-                tileSprite.setDepth(11);
+                // Bottom part of tree (trunk/stump) - depth based on tree position
+                tileSprite.setDepth(trunkDepth);
             }
         });
 

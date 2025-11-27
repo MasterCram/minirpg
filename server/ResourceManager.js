@@ -32,6 +32,16 @@ class ResourceManager {
         return false;
     }
 
+    isInSpawnZone(gridX, gridY) {
+        // Check if position is in the spawn safe zone (middle 5x5)
+        const minX = CONFIG.SPAWN_ZONE.CENTER_X - CONFIG.SPAWN_ZONE.RADIUS;
+        const maxX = CONFIG.SPAWN_ZONE.CENTER_X + CONFIG.SPAWN_ZONE.RADIUS;
+        const minY = CONFIG.SPAWN_ZONE.CENTER_Y - CONFIG.SPAWN_ZONE.RADIUS;
+        const maxY = CONFIG.SPAWN_ZONE.CENTER_Y + CONFIG.SPAWN_ZONE.RADIUS;
+
+        return gridX >= minX && gridX <= maxX && gridY >= minY && gridY <= maxY;
+    }
+
     generateResources() {
         console.log('Generating resources...');
         this.resources = [];
@@ -41,7 +51,9 @@ class ResourceManager {
 
         // Helper function to check if tile is occupied
         const isTileOccupied = (gridX, gridY) => {
-            return occupiedTiles.has(`${gridX},${gridY}`) || this.isNearMultiTileTree(gridX, gridY);
+            return occupiedTiles.has(`${gridX},${gridY}`) ||
+                   this.isNearMultiTileTree(gridX, gridY) ||
+                   this.isInSpawnZone(gridX, gridY);
         };
 
         // Generate trees
@@ -137,12 +149,12 @@ class ResourceManager {
                 const gridX = Math.floor(Math.random() * CONFIG.WORLD_WIDTH);
                 const gridY = Math.floor(Math.random() * CONFIG.WORLD_HEIGHT);
 
-                // Check if tile is already occupied or near multi-tile trees
+                // Check if tile is already occupied, near multi-tile trees, or in spawn zone
                 const occupied = this.resources.some(r => {
                     const rGridX = Math.floor(r.x / CONFIG.TILE_SIZE);
                     const rGridY = Math.floor(r.y / CONFIG.TILE_SIZE);
                     return rGridX === gridX && rGridY === gridY;
-                }) || this.isNearMultiTileTree(gridX, gridY);
+                }) || this.isNearMultiTileTree(gridX, gridY) || this.isInSpawnZone(gridX, gridY);
 
                 if (!occupied) {
                     const newResource = {
