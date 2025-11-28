@@ -77,10 +77,10 @@
         transparentRows: [0, 1, 2]  // Top 3 rows (roof and upper walls)
       },
       WELL: {
-        transparentRows: []  // No transparency for well
+        transparentRows: [0]  // Top row (row 0) becomes transparent when player behind
       },
       PORTAL: {
-        transparentRows: []  // No transparency for portal
+        transparentRows: [0]  // Top row (row 0) becomes transparent when player behind
       }
     },
 

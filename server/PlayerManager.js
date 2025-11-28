@@ -24,6 +24,7 @@ class PlayerManager {
             username: `Player${Math.floor(Math.random() * 1000)}`,
             health: 10,
             maxHealth: 10,
+            currentInstance: 'town', // Track which map instance player is in
             inventory: Array(CONFIG.INVENTORY_SLOTS).fill(null),
             equipment: {
                 cape: null,
@@ -57,10 +58,10 @@ class PlayerManager {
             gatheringStartTime: null,
             gatheringResourceId: null,
             gatheringItemId: null,
+            gatheringWellId: null,
+            gatheringPortalId: null,
             gatheringDuration: CONFIG.GATHERING_DURATION,
-            itemPickupDuration: CONFIG.ITEM_PICKUP_DURATION,
-            // Well cooldown
-            lastWellUse: 0
+            itemPickupDuration: CONFIG.ITEM_PICKUP_DURATION
         };
 
         return this.players[socketId];
@@ -189,24 +190,86 @@ class PlayerManager {
         player.gatheringStartTime = null;
         player.gatheringResourceId = null;
         player.gatheringItemId = null;
+        player.gatheringWellId = null;
+        player.gatheringPortalId = null;
 
         this.io.emit('playerFinishedGathering', { playerId: socketId });
+    }
+
+    startUsingWell(socketId, duration) {
+        const player = this.players[socketId];
+        if (!player) return;
+
+        player.isGathering = true;
+        player.gatheringStartTime = Date.now();
+        player.gatheringWellId = 'well';
+        player.gatheringResourceId = null;
+        player.gatheringItemId = null;
+        player.gatheringPortalId = null;
+        player.isMoving = false;
+        player.path = [];
+
+        this.io.emit('playerStartedGathering', {
+            playerId: socketId,
+            resourceId: 'well',
+            duration: duration
+        });
+    }
+
+    startUsingPortal(socketId, portalId, duration) {
+        const player = this.players[socketId];
+        if (!player) return;
+
+        player.isGathering = true;
+        player.gatheringStartTime = Date.now();
+        player.gatheringPortalId = portalId;
+        player.gatheringResourceId = null;
+        player.gatheringItemId = null;
+        player.gatheringWellId = null;
+        player.isMoving = false;
+        player.path = [];
+
+        this.io.emit('playerStartedGathering', {
+            playerId: socketId,
+            resourceId: portalId,
+            duration: duration
+        });
     }
 
     healPlayer(socketId) {
         const player = this.players[socketId];
         if (!player) return false;
 
-        const now = Date.now();
-        if (now - player.lastWellUse < 3000) {
-            return false; // Still on cooldown
-        }
-
         player.health = player.maxHealth;
-        player.lastWellUse = now;
         this.io.to(socketId).emit('healthUpdate', { health: player.health, maxHealth: player.maxHealth });
         return true;
     }
+
+    teleportPlayer(socketId, instanceId, x, y) {
+        const player = this.players[socketId];
+        if (!player) return false;
+
+        player.currentInstance = instanceId;
+        player.x = x;
+        player.y = y;
+        player.isMoving = false;
+        player.path = [];
+        player.pathIndex = 0;
+
+        console.log(`Player ${socketId} teleported to instance ${instanceId} at (${x}, ${y})`);
+        return true;
+    }
+
+    getPlayersInInstance(instanceId) {
+        const playersInInstance = {};
+        Object.keys(this.players).forEach(playerId => {
+            if (this.players[playerId].currentInstance === instanceId) {
+                playersInInstance[playerId] = this.players[playerId];
+            }
+        });
+        return playersInInstance;
+    }
 }
+
 
 module.exports = PlayerManager;

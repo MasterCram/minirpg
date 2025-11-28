@@ -10,6 +10,7 @@ const ResourceManager = require('./ResourceManager');
 const PlayerManager = require('./PlayerManager');
 const DroppedItemManager = require('./DroppedItemManager');
 const GameLoop = require('./GameLoop');
+const InstanceManager = require('./InstanceManager');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,7 +32,8 @@ const mapGenerator = new MapGenerator();
 const resourceManager = new ResourceManager(pathFinder, io);
 const playerManager = new PlayerManager(io);
 const droppedItemManager = new DroppedItemManager(io);
-const gameLoop = new GameLoop(io, playerManager, resourceManager, droppedItemManager);
+const instanceManager = new InstanceManager(io);
+const gameLoop = new GameLoop(io, playerManager, resourceManager, droppedItemManager, instanceManager, pathFinder, mapGenerator);
 
 // Generate initial world
 mapGenerator.generateMap();
@@ -54,9 +56,20 @@ multiTileObjects.forEach(obj => {
       }
     });
   } else if (obj.type === 'well') {
-    // Mark all well tiles as obstacles (can't walk through well)
+    // Mark bottom tiles of well as obstacles (can walk behind top tile)
     obj.tiles.forEach(tile => {
-      pathFinder.setObstacle(tile.x, tile.y, true);
+      const relativeY = tile.y - obj.y;
+      if (relativeY >= 1) { // Bottom 2 rows of the 3-row well (rows 1-2)
+        pathFinder.setObstacle(tile.x, tile.y, true);
+      }
+    });
+  } else if (obj.type === 'portal') {
+    // Mark bottom tiles of portal as obstacles (can walk behind top tile)
+    obj.tiles.forEach(tile => {
+      const relativeY = tile.y - obj.y;
+      if (relativeY >= 1) { // Bottom row of the 2-row portal
+        pathFinder.setObstacle(tile.x, tile.y, true);
+      }
     });
   }
 });
@@ -104,8 +117,17 @@ io.on('connection', (socket) => {
     const player = playerManager.getPlayer(socket.id);
     if (!player) return;
 
+    // Get correct pathfinder based on player's instance
+    let currentPathFinder = pathFinder;
+    if (player.currentInstance !== 'town') {
+      const instance = instanceManager.getInstance(player.currentInstance);
+      if (instance && instance.pathFinder) {
+        currentPathFinder = instance.pathFinder;
+      }
+    }
+
     // Calculate path on server
-    const path = pathFinder.findPath(startX, startY, endX, endY);
+    const path = currentPathFinder.findPath(startX, startY, endX, endY);
 
     if (path === null) {
       console.log('No path found - obstacle blocking');
@@ -122,8 +144,8 @@ io.on('connection', (socket) => {
     // Set path on server-side player object
     playerManager.setPlayerPath(socket.id, path, targetResourceId);
 
-    // Broadcast path to all clients
-    io.emit('playerPath', {
+    // Broadcast path to client
+    socket.emit('playerPath', {
       playerId: socket.id,
       path: path,
       targetResourceId: targetResourceId
@@ -137,7 +159,16 @@ io.on('connection', (socket) => {
 
     if (!player || player.isGathering) return;
 
-    const resource = resourceManager.findResource(resourceId);
+    // Get correct resource manager based on player's instance
+    let currentResourceManager = resourceManager;
+    if (player.currentInstance !== 'town') {
+      const instance = instanceManager.getInstance(player.currentInstance);
+      if (instance && instance.resourceManager) {
+        currentResourceManager = instance.resourceManager;
+      }
+    }
+
+    const resource = currentResourceManager.findResource(resourceId);
     if (!resource) return;
 
     // Verify player is adjacent to resource
@@ -233,13 +264,49 @@ io.on('connection', (socket) => {
   });
 
   // Handle well usage
-  socket.on('useWell', () => {
-    const success = playerManager.healPlayer(socket.id);
-    if (!success) {
-      socket.emit('wellCooldown', { message: 'Well is on cooldown (3 seconds)' });
-    } else {
-      console.log(`${socket.id} used the well and healed to full health`);
+  socket.on('useWell', (data) => {
+    const { wellX, wellY } = data;
+    const player = playerManager.getPlayer(socket.id);
+
+    if (!player || player.isGathering) return;
+
+    // Check proximity - player must be adjacent to well
+    const playerGridX = Math.floor(player.x / CONFIG.TILE_SIZE);
+    const playerGridY = Math.floor(player.y / CONFIG.TILE_SIZE);
+
+    const distance = Math.abs(playerGridX - wellX) + Math.abs(playerGridY - wellY);
+
+    if (distance > 1) {
+      console.log('Player too far from well');
+      return;
     }
+
+    // Start using well (3 second interaction)
+    playerManager.startUsingWell(socket.id, CONFIG.GATHERING_DURATION);
+    console.log(`${socket.id} started using the well`);
+  });
+
+  // Handle portal usage
+  socket.on('usePortal', (data) => {
+    const { portalX, portalY, portalId } = data;
+    const player = playerManager.getPlayer(socket.id);
+
+    if (!player || player.isGathering) return;
+
+    // Check proximity - player must be adjacent to portal
+    const playerGridX = Math.floor(player.x / CONFIG.TILE_SIZE);
+    const playerGridY = Math.floor(player.y / CONFIG.TILE_SIZE);
+
+    const distance = Math.abs(playerGridX - portalX) + Math.abs(playerGridY - portalY);
+
+    if (distance > 1) {
+      console.log('Player too far from portal');
+      return;
+    }
+
+    // Start using portal (3 second interaction)
+    playerManager.startUsingPortal(socket.id, portalId, CONFIG.GATHERING_DURATION);
+    console.log(`${socket.id} started using the portal`);
   });
 
   // Handle disconnect

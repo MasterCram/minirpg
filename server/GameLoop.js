@@ -1,11 +1,14 @@
 const CONFIG = require('../shared/config');
 
 class GameLoop {
-    constructor(io, playerManager, resourceManager, droppedItemManager) {
+    constructor(io, playerManager, resourceManager, droppedItemManager, instanceManager, townPathFinder, townMapGenerator) {
         this.io = io;
         this.playerManager = playerManager;
         this.resourceManager = resourceManager;
         this.droppedItemManager = droppedItemManager;
+        this.instanceManager = instanceManager;
+        this.townPathFinder = townPathFinder;
+        this.townMapGenerator = townMapGenerator;
         this.lastUpdateTime = Date.now();
     }
 
@@ -47,13 +50,27 @@ class GameLoop {
         if (!player.isGathering || player.gatheringStartTime === null) return;
 
         const isPickingUpItem = player.gatheringItemId !== null;
+        const isUsingWell = player.gatheringWellId !== null;
+        const isUsingPortal = player.gatheringPortalId !== null;
+
         const duration = isPickingUpItem ? player.itemPickupDuration : player.gatheringDuration;
         const elapsed = currentTime - player.gatheringStartTime;
         const progress = Math.min(elapsed / duration, 1);
 
+        let resourceId;
+        if (isPickingUpItem) {
+            resourceId = player.gatheringItemId;
+        } else if (isUsingWell) {
+            resourceId = player.gatheringWellId;
+        } else if (isUsingPortal) {
+            resourceId = player.gatheringPortalId;
+        } else {
+            resourceId = player.gatheringResourceId;
+        }
+
         gatheringUpdates.push({
             playerId: playerId,
-            resourceId: isPickingUpItem ? player.gatheringItemId : player.gatheringResourceId,
+            resourceId: resourceId,
             progress: progress
         });
 
@@ -61,6 +78,10 @@ class GameLoop {
         if (progress >= 1) {
             if (isPickingUpItem) {
                 this.completeItemPickup(player, playerId);
+            } else if (isUsingWell) {
+                this.completeWellUsage(player, playerId);
+            } else if (isUsingPortal) {
+                this.completePortalUsage(player, playerId);
             } else {
                 this.completeResourceGathering(player, playerId);
             }
@@ -84,8 +105,71 @@ class GameLoop {
         this.playerManager.stopGathering(playerId);
     }
 
+    completeWellUsage(player, playerId) {
+        // Heal player to full health
+        this.playerManager.healPlayer(playerId);
+        this.playerManager.stopGathering(playerId);
+        console.log(`${playerId} used the well and healed to full health`);
+    }
+
+    completePortalUsage(player, playerId) {
+        this.playerManager.stopGathering(playerId);
+
+        const currentInstance = player.currentInstance;
+
+        if (currentInstance === 'town') {
+            // Teleport to forest instance
+            const forestInstance = this.instanceManager.createForestInstance(playerId);
+
+            // Teleport player to spawn point in forest (center of map)
+            const spawnX = Math.floor(CONFIG.WORLD_WIDTH / 2) * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+            const spawnY = 2 * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2; // Top of map
+
+            this.playerManager.teleportPlayer(playerId, forestInstance.id, spawnX, spawnY);
+
+            // Send instance change to client
+            this.io.to(playerId).emit('instanceChange', {
+                instanceId: forestInstance.id,
+                map: forestInstance.map,
+                multiTileObjects: forestInstance.multiTileObjects,
+                resources: forestInstance.resourceManager.getResources(),
+                playerX: spawnX,
+                playerY: spawnY
+            });
+
+            console.log(`${playerId} teleported to forest instance ${forestInstance.id}`);
+        } else if (currentInstance.startsWith('forest_')) {
+            // Teleport back to town
+            const spawnX = Math.floor(CONFIG.WORLD_WIDTH / 2) * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+            const spawnY = Math.floor(CONFIG.WORLD_HEIGHT / 2) * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+
+            this.playerManager.teleportPlayer(playerId, 'town', spawnX, spawnY);
+
+            // Send instance change to client
+            this.io.to(playerId).emit('instanceChange', {
+                instanceId: 'town',
+                map: this.townMapGenerator.getMap(),
+                multiTileObjects: this.townMapGenerator.getMultiTileObjects(),
+                resources: this.resourceManager.getResources(),
+                playerX: spawnX,
+                playerY: spawnY
+            });
+
+            console.log(`${playerId} teleported back to town from ${currentInstance}`);
+        }
+    }
+
     completeResourceGathering(player, playerId) {
-        const resource = this.resourceManager.findResource(player.gatheringResourceId);
+        // Get correct resource manager based on player's instance
+        let currentResourceManager = this.resourceManager;
+        if (player.currentInstance !== 'town') {
+            const instance = this.instanceManager.getInstance(player.currentInstance);
+            if (instance && instance.resourceManager) {
+                currentResourceManager = instance.resourceManager;
+            }
+        }
+
+        const resource = currentResourceManager.findResource(player.gatheringResourceId);
 
         if (resource) {
             // Determine items to add
@@ -94,6 +178,8 @@ class GameLoop {
                 itemsToAdd = ['wood', 'wood']; // Bushes give 2 woods
             } else if (resource.type === 'rock') {
                 itemsToAdd = ['stone']; // Rocks give 1 stone
+            } else if (resource.type === 'tree') {
+                itemsToAdd = ['wood', 'wood', 'wood']; // Trees give 3 woods
             }
 
             // Check if inventory has enough space
@@ -109,8 +195,8 @@ class GameLoop {
             this.playerManager.addMultipleItemsToInventory(playerId, itemsToAdd);
 
             // Remove resource and respawn
-            this.resourceManager.removeResource(player.gatheringResourceId);
-            this.resourceManager.respawnResource(resource.type);
+            currentResourceManager.removeResource(player.gatheringResourceId);
+            currentResourceManager.respawnResource(resource.type);
 
             console.log(`${playerId} gathered ${resource.type}`);
         }
@@ -150,7 +236,16 @@ class GameLoop {
                     const resourceId = player.targetResourceId;
                     player.targetResourceId = null;
 
-                    const resource = this.resourceManager.findResource(resourceId);
+                    // Get correct resource manager based on player's instance
+                    let currentResourceManager = this.resourceManager;
+                    if (player.currentInstance !== 'town') {
+                        const instance = this.instanceManager.getInstance(player.currentInstance);
+                        if (instance && instance.resourceManager) {
+                            currentResourceManager = instance.resourceManager;
+                        }
+                    }
+
+                    const resource = currentResourceManager.findResource(resourceId);
                     if (resource) {
                         this.playerManager.startGathering(playerId, resourceId, player.gatheringDuration);
                     }

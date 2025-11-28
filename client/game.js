@@ -313,6 +313,12 @@ function setupSocketConnection(scene) {
     socket.on('itemPickedUp', (data) => {
         removeDroppedItem(data.itemId);
     });
+
+    // Listen for instance changes (teleportation)
+    socket.on('instanceChange', (data) => {
+        console.log('Instance change received:', data.instanceId);
+        handleInstanceChange(scene, data);
+    });
 }
 
 function setupInputHandlers(scene) {
@@ -467,7 +473,16 @@ function renderMultiTileObjects(scene, receivedObjects) {
                 tileSprite.setInteractive();
                 tileSprite.on('pointerdown', (pointer) => {
                     pointer.event.stopPropagation();
-                    handleWellClick();
+                    handleWellClick(obj);
+                });
+            }
+
+            // Make portals interactive
+            if (obj.type === 'portal') {
+                tileSprite.setInteractive();
+                tileSprite.on('pointerdown', (pointer) => {
+                    pointer.event.stopPropagation();
+                    handlePortalClick(obj);
                 });
             }
 
@@ -675,11 +690,115 @@ function updatePlayerCount() {
     }
 }
 
-function handleWellClick() {
-    if (!mainPlayer || !socket) return;
+function handleWellClick(wellObj) {
+    if (!mainPlayer || mainPlayer.isGathering || !socket) return;
 
     console.log('Well clicked');
-    socket.emit('useWell');
+
+    const playerPos = mainPlayer.getGridPosition();
+
+    // Get well center position
+    const wellCenterX = wellObj.x + Math.floor(wellObj.width / 2);
+    const wellCenterY = wellObj.y + Math.floor(wellObj.height / 2);
+
+    // Calculate Manhattan distance to well center
+    const distance = Math.abs(playerPos.x - wellCenterX) + Math.abs(playerPos.y - wellCenterY);
+
+    if (distance <= 1) {
+        // Adjacent to well, start using it
+        socket.emit('useWell', { wellX: wellCenterX, wellY: wellCenterY });
+    } else {
+        // Too far, need to move closer
+        console.log('Player too far from well');
+        showTemporaryMessage('You need to be closer to use the well');
+    }
+}
+
+function handlePortalClick(portalObj) {
+    if (!mainPlayer || mainPlayer.isGathering || !socket) return;
+
+    console.log('Portal clicked');
+
+    const playerPos = mainPlayer.getGridPosition();
+
+    // Get portal center position
+    const portalCenterX = portalObj.x + Math.floor(portalObj.width / 2);
+    const portalCenterY = portalObj.y + Math.floor(portalObj.height / 2);
+
+    // Calculate Manhattan distance to portal center
+    const distance = Math.abs(playerPos.x - portalCenterX) + Math.abs(playerPos.y - portalCenterY);
+
+    if (distance <= 1) {
+        // Adjacent to portal, start using it
+        socket.emit('usePortal', { portalX: portalCenterX, portalY: portalCenterY, portalId: 'town_portal' });
+    } else {
+        // Too far, need to move closer
+        console.log('Player too far from portal');
+        showTemporaryMessage('You need to be closer to use the portal');
+    }
+}
+
+function handleInstanceChange(scene, data) {
+    const { instanceId, map, multiTileObjects: newMultiTileObjects, resources: newResources, playerX, playerY } = data;
+
+    // Clear path dots
+    clearPathDots();
+
+    // Clear all existing resources
+    Object.values(resources).forEach(resource => {
+        resource.destroy();
+    });
+    resources = {};
+
+    // Clear all existing dropped items
+    Object.values(droppedItems).forEach(item => {
+        item.destroy();
+    });
+    droppedItems = {};
+
+    // Clear other players (they're in different instances)
+    Object.values(otherPlayers).forEach(player => {
+        player.destroy();
+    });
+    otherPlayers = {};
+    updatePlayerCount();
+
+    // Clear transparent objects array
+    transparentObjects = [];
+
+    // Destroy all existing game objects (map tiles, multi-tile objects)
+    scene.children.list.forEach(child => {
+        if (child.type === 'Sprite' || child.type === 'Graphics') {
+            child.destroy();
+        }
+    });
+
+    // Regenerate map
+    gameMap = map;
+    generateMap(scene, map);
+
+    // Render new multi-tile objects
+    renderMultiTileObjects(scene, newMultiTileObjects);
+
+    // Create new resources
+    newResources.forEach(resourceData => {
+        createResource(scene, resourceData);
+    });
+
+    // Teleport main player
+    if (mainPlayer) {
+        mainPlayer.sprite.x = playerX;
+        mainPlayer.sprite.y = playerY;
+        mainPlayer.x = playerX;
+        mainPlayer.y = playerY;
+        mainPlayer.isMoving = false;
+        mainPlayer.path = [];
+
+        // Center camera on player
+        scene.cameras.main.centerOn(playerX, playerY);
+    }
+
+    console.log(`Teleported to instance: ${instanceId}`);
 }
 
 function showTemporaryMessage(message) {
